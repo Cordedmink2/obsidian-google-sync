@@ -16,6 +16,7 @@ interface PersistedData {
 }
 
 const DEBOUNCE_MS = 750;
+const SETTINGS_SAVE_DEBOUNCE_MS = 500;
 const LIFECYCLE_CHECK_MS = 60 * 60 * 1000; // hourly tick
 const LIFECYCLE_MIN_INTERVAL_MS = 23 * 60 * 60 * 1000; // ~daily
 
@@ -33,6 +34,8 @@ export default class GoogleSyncPlugin extends Plugin {
     private lifecycle!: Lifecycle;
     private lastLifecycleRun = 0;
     private timers = new Map<string, number>();
+    private settingsSaveTimer: number | null = null;
+    private settingsSavePending: Promise<void> | null = null;
 
     async onload(): Promise<void> {
         await this.loadAll();
@@ -69,6 +72,11 @@ export default class GoogleSyncPlugin extends Plugin {
     onunload(): void {
         for (const id of this.timers.values()) window.clearTimeout(id);
         this.timers.clear();
+        if (this.settingsSaveTimer !== null) {
+            window.clearTimeout(this.settingsSaveTimer);
+            this.settingsSaveTimer = null;
+            void this.saveAll();
+        }
     }
 
     // ---- persistence (settings + tokens together in data.json) ----
@@ -91,6 +99,33 @@ export default class GoogleSyncPlugin extends Plugin {
 
     async saveSettings(): Promise<void> {
         await this.saveAll();
+    }
+
+    /**
+     * Debounced settings save. Coalesces rapid changes (e.g. each keystroke in a text input)
+     * into a single disk write — without this Obsidian Sync would upload data.json on every
+     * character and hang the renderer.
+     */
+    scheduleSaveSettings(): void {
+        if (this.settingsSaveTimer !== null) window.clearTimeout(this.settingsSaveTimer);
+        this.settingsSaveTimer = window.setTimeout(() => {
+            this.settingsSaveTimer = null;
+            this.settingsSavePending = this.saveAll().finally(() => {
+                this.settingsSavePending = null;
+            });
+        }, SETTINGS_SAVE_DEBOUNCE_MS);
+    }
+
+    /** Flush any pending debounced settings save. Call when leaving the settings tab. */
+    async flushPendingSettingsSave(): Promise<void> {
+        if (this.settingsSaveTimer !== null) {
+            window.clearTimeout(this.settingsSaveTimer);
+            this.settingsSaveTimer = null;
+            this.settingsSavePending = this.saveAll().finally(() => {
+                this.settingsSavePending = null;
+            });
+        }
+        if (this.settingsSavePending) await this.settingsSavePending;
     }
 
     private tokenStore(): TokenStore {
