@@ -115,6 +115,10 @@ To create clean event/task notes quickly, you can pair this plugin with the **Te
 
 This gives you prebuilt event/task templates and can auto-configure Templater’s template folder + trigger-on-create behavior.
 
+Then add the folder mappings in Obsidian:
+- `events` → `templates/google-sync/event-template.md`
+- `tasks` → `templates/google-sync/task-template.md`
+
 ## 7. Test with safe data first
 
 Before syncing important real calendars/tasks:

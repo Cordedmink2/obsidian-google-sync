@@ -48,7 +48,10 @@ with:
 3. In **Templater settings**:
    - Template folder location: `templates`
    - Trigger Templater on new file creation: On
-4. In **Google Sync settings**:
+4. In **Templater → Folder Templates** (important mapping step):
+   - Map `events` → `templates/google-sync/event-template.md`
+   - Map `tasks` → `templates/google-sync/task-template.md`
+5. In **Google Sync settings**:
    - Events folder: `events`
    - Tasks folder: `tasks`
 

@@ -55,7 +55,7 @@ The plugin needs your own Google OAuth client. This avoids any shared hosted bac
 
 Follow the full guide here:
 
-- [Google setup guide](docs/google-setup.md)
+- [Google setup guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/google-setup.md)
 
 Short version:
 
@@ -70,13 +70,13 @@ Short version:
 
 For iPhone/iPad setup and checks, use:
 
-- [iOS checklist](docs/ios-checklist.md)
+- [iOS checklist](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/ios-checklist.md)
 
 ## Optional: Templater workflow (recommended)
 
 If you use the **Templater** community plugin, you can auto-insert valid event/task frontmatter when creating new notes.
 
-- Full guide: [Templater setup](docs/templater-setup.md)
+- Full guide: [Templater setup](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/templater-setup.md)
 - Quick install link: `obsidian://show-plugin?id=templater-obsidian`
 - One-command scaffold:
 
@@ -85,6 +85,10 @@ If you use the **Templater** community plugin, you can auto-insert valid event/t
 ```
 
 This creates event/task templates and can auto-configure Templater’s template folder + trigger-on-create setting.
+
+Then add folder mappings in Obsidian Templater:
+- `events` → `templates/google-sync/event-template.md`
+- `tasks` → `templates/google-sync/task-template.md`
 
 ## Commands
 
@@ -165,6 +169,6 @@ Set `completed: true` and sync to mark the task completed in Google Tasks.
 
 More developer and test notes:
 
-- [Development guide](docs/development.md)
-- [Google setup guide](docs/google-setup.md)
-- [iOS checklist](docs/ios-checklist.md)
+- [Development guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/development.md)
+- [Google setup guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/google-setup.md)
+- [iOS checklist](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/ios-checklist.md)
