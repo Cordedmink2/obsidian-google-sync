@@ -24,36 +24,24 @@
             plugin's "Redirect bridge URL" setting. It only forwards the single-use code+state to
             obsidian://google-sync; with PKCE it cannot exchange the code itself, so it is safe to
             host statically and even share.
+
+            Redirect logic lives in redirect.js so it can be unit-tested.
         -->
-        <script>
-            (function () {
-                var p = new URLSearchParams(window.location.search);
-                var error = p.get("error");
-                var code = p.get("code");
-                var state = p.get("state");
-                var msg = document.getElementById("msg");
-                var target = null;
-                if (error) {
-                    target = "obsidian://google-sync?error=" + encodeURIComponent(error);
-                } else if (code && state) {
-                    target =
-                        "obsidian://google-sync?code=" +
-                        encodeURIComponent(code) +
-                        "&state=" +
-                        encodeURIComponent(state);
-                }
-                if (!target) {
-                    msg.textContent = "Missing authorization code. Please retry from Obsidian.";
-                    return;
-                }
-                window.location.href = target;
+        <script type="module">
+            import { computeBridgeRedirect } from "./redirect.js";
+            const r = computeBridgeRedirect(window.location.search);
+            const msg = document.getElementById("msg");
+            if (!r.target) {
+                msg.textContent = r.message;
+            } else {
+                window.location.href = r.target;
                 msg.textContent = "If Obsidian did not open automatically, ";
-                var link = document.createElement("a");
+                const link = document.createElement("a");
                 link.textContent = "tap here";
-                link.setAttribute("href", target);
+                link.setAttribute("href", r.target);
                 msg.appendChild(link);
                 msg.appendChild(document.createTextNode("."));
-            })();
+            }
         </script>
     </body>
 </html>
