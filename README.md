@@ -72,6 +72,20 @@ For iPhone/iPad setup and checks, use:
 
 - [iOS checklist](docs/ios-checklist.md)
 
+## Optional: Templater workflow (recommended)
+
+If you use the **Templater** community plugin, you can auto-insert valid event/task frontmatter when creating new notes.
+
+- Full guide: [Templater setup](docs/templater-setup.md)
+- Quick install link: `obsidian://show-plugin?id=templater-obsidian`
+- One-command scaffold:
+
+```bash
+./scripts/setup-templater.sh /path/to/your/vault --configure-templater
+```
+
+This creates event/task templates and can auto-configure Templater’s template folder + trigger-on-create setting.
+
 ## Commands
 
 Open Obsidian’s command palette and search for these commands:

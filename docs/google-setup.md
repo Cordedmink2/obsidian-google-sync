@@ -101,6 +101,20 @@ Then run these commands from the command palette:
 4. Run **Validate setup**.
 5. Run **Test connection**.
 
+## Optional: Templater workflow (recommended)
+
+To create clean event/task notes quickly, you can pair this plugin with the **Templater** community plugin.
+
+- Install link: `obsidian://show-plugin?id=templater-obsidian`
+- Setup guide: [Templater setup](templater-setup.md)
+- Scripted scaffold:
+
+```bash
+./scripts/setup-templater.sh /path/to/your/vault --configure-templater
+```
+
+This gives you prebuilt event/task templates and can auto-configure Templater’s template folder + trigger-on-create behavior.
+
 ## 7. Test with safe data first
 
 Before syncing important real calendars/tasks:
