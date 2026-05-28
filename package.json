@@ -1,6 +1,6 @@
 {
     "name": "obsidian-google-sync",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Sync your vault's events and tasks folders to Google Calendar and Google Tasks.",
     "main": "main.js",
     "scripts": {
