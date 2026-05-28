@@ -20,6 +20,7 @@ export interface GoogleSyncSettings {
     syncOnModify: boolean;
     syncOnDelete: boolean;
     importOnlyDefaultCalendar: boolean;
+    importOnlyDefaultTaskList: boolean;
     autoArchiveEnabled: boolean;
     autoArchiveDaysPast: number;
     autoCloseTasksOnArchive: boolean;
@@ -46,6 +47,7 @@ export const DEFAULT_SETTINGS: GoogleSyncSettings = {
     syncOnModify: true,
     syncOnDelete: true,
     importOnlyDefaultCalendar: true,
+    importOnlyDefaultTaskList: true,
     autoArchiveEnabled: true,
     autoArchiveDaysPast: 1,
     autoCloseTasksOnArchive: true,
@@ -239,6 +241,11 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
             "Import only configured calendar",
             "When importing from Google, only pull events from the default calendar above.",
             "importOnlyDefaultCalendar",
+        );
+        this.toggle(
+            "Import only configured task list",
+            "When importing from Google, only pull tasks from the task list above.",
+            "importOnlyDefaultTaskList",
         );
         this.toggle(
             "Auto-archive past events",

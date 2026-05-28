@@ -260,11 +260,20 @@ export default class GoogleSyncPlugin extends Plugin {
         }
         try {
             const { events, tasks, failed } = await this.importer.importAll();
+            const lifecycleCounts = await this.lifecycle.runOnce();
+            this.lastLifecycleRun = Date.now();
+            await this.saveAll();
             this.router.buildIndex();
+            const moved =
+                lifecycleCounts.archived + lifecycleCounts.overdue + lifecycleCounts.completed;
+            const lifecycleSuffix =
+                moved > 0
+                    ? ` Lifecycle moved ${lifecycleCounts.archived} archived, ${lifecycleCounts.overdue} overdue, ${lifecycleCounts.completed} completed.`
+                    : "";
             new Notice(
                 failed > 0
-                    ? `google-sync: imported ${events} event(s), ${tasks} task(s), ${failed} failed.`
-                    : `google-sync: imported ${events} event(s) and ${tasks} task(s).`,
+                    ? `google-sync: imported ${events} event(s), ${tasks} task(s), ${failed} failed.${lifecycleSuffix}`
+                    : `google-sync: imported ${events} event(s) and ${tasks} task(s).${lifecycleSuffix}`,
             );
         } catch (e) {
             new Notice(`google-sync import error: ${(e as Error).message}`);

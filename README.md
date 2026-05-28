@@ -40,7 +40,7 @@ Open Obsidian's command palette and search for:
 
 - **Connect to Google** — sign in (do this once).
 - **Sync now** — push your latest changes to Google.
-- **Import events and tasks from Google** — pull events from your configured Google Calendar and Google Tasks into your vault folders.
+- **Import events and tasks from Google** — pull events/tasks from your configured Google Calendar and Google Tasks list into your vault folders. By default it only imports the configured calendar/list to avoid vault spam; turn off the import-only toggles if you intentionally want every visible calendar/task list. It runs the lifecycle tidy-up immediately afterwards, so imported past events go to `events/archive/` and imported overdue/completed tasks go to `tasks/overdue/` or `tasks/completed/`.
 - **Run lifecycle scan** — archive past events and tidy completed/overdue tasks.
 - **Test connection** — quick check that Google is reachable.
 - **Validate setup** — confirms your settings, calendar, and task list all work.

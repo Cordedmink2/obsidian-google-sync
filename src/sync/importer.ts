@@ -100,6 +100,7 @@ export class GoogleImporter {
 
     private async taskListIds(): Promise<string[]> {
         const s = this.settings();
+        if (s.importOnlyDefaultTaskList) return [s.taskListId];
         const lists = await this.tasks.listTaskLists();
         const ids = lists.map((l) => l.id).filter((id): id is string => !!id);
         if (s.taskListId && !ids.includes(s.taskListId)) ids.unshift(s.taskListId);

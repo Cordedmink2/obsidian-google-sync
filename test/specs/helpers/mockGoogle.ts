@@ -45,6 +45,12 @@ function install(): void {
                         start: { dateTime: "2026-06-02T09:00:00+12:00", timeZone: "Pacific/Auckland" },
                         end: { dateTime: "2026-06-02T10:00:00+12:00", timeZone: "Pacific/Auckland" },
                     },
+                    {
+                        id: "past-import-event-1",
+                        summary: "Past imported appointment",
+                        start: { dateTime: "2026-01-02T09:00:00+13:00", timeZone: "Pacific/Auckland" },
+                        end: { dateTime: "2026-01-02T10:00:00+13:00", timeZone: "Pacific/Auckland" },
+                    },
                 ],
                 nextSyncToken: "sync-token",
             });
@@ -66,6 +72,17 @@ function install(): void {
                     { id: "L1", title: "Test list" },
                 ],
             });
+        if (method === "GET" && req.url.includes("/lists/%40default/tasks"))
+            return ok({
+                items: [
+                    {
+                        id: "default-import-task-1",
+                        title: "Default list task",
+                        due: "2026-06-01T00:00:00.000Z",
+                        status: "needsAction",
+                    },
+                ],
+            });
         if (method === "GET" && req.url.includes("/lists/L1/tasks"))
             return ok({
                 items: [
@@ -73,6 +90,12 @@ function install(): void {
                         id: "import-task-1",
                         title: "Imported task",
                         due: "2026-06-01T00:00:00.000Z",
+                        status: "needsAction",
+                    },
+                    {
+                        id: "late-import-task-1",
+                        title: "Late imported task",
+                        due: "2026-01-01T00:00:00.000Z",
                         status: "needsAction",
                     },
                 ],

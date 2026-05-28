@@ -82,6 +82,8 @@ describe("settings tab (UI)", function () {
             "Sync on create",
             "Sync on modify",
             "Sync on delete",
+            "Import only configured calendar",
+            "Import only configured task list",
             "Auto-archive past events",
             "Auto-close linked tasks on archive",
             "Archive after days past",
