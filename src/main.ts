@@ -280,13 +280,16 @@ export default class GoogleSyncPlugin extends Plugin {
         if (!this.settings.importOnStartup) return;
         if (!(await this.auth.isConnected())) return;
         try {
-            await this.runImportPipeline();
+            await this.runImportPipeline({ createOnly: true, lifecycleOnlyWhenAdded: true });
         } catch (e) {
             console.error("[google-sync] startup import failed", e);
         }
     }
 
-    private async runImportPipeline(): Promise<{
+    private async runImportPipeline(options: {
+        createOnly?: boolean;
+        lifecycleOnlyWhenAdded?: boolean;
+    } = {}): Promise<{
         events: number;
         tasks: number;
         failed: number;
@@ -303,10 +306,18 @@ export default class GoogleSyncPlugin extends Plugin {
             lifecycleCounts: Awaited<ReturnType<Lifecycle["runOnce"]>>;
         };
         this.importInFlight = (async () => {
-            const { events, tasks, failed } = await this.importer.importAll();
-            const lifecycleCounts = await this.lifecycle.runOnce();
-            this.lastLifecycleRun = Date.now();
-            await this.saveAll();
+            const { events, tasks, failed } = await this.importer.importAll({
+                createOnly: options.createOnly,
+            });
+            const addedOrUpdated = events + tasks;
+            const lifecycleCounts =
+                options.lifecycleOnlyWhenAdded && addedOrUpdated === 0
+                    ? { archived: 0, overdue: 0, completed: 0 }
+                    : await this.lifecycle.runOnce();
+            if (!options.lifecycleOnlyWhenAdded || addedOrUpdated > 0) {
+                this.lastLifecycleRun = Date.now();
+                await this.saveAll();
+            }
             this.router.buildIndex();
             result = { events, tasks, failed, lifecycleCounts };
         })();

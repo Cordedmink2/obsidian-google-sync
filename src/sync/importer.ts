@@ -12,6 +12,11 @@ export interface ImportCounts {
     failed: number;
 }
 
+export interface ImportOptions {
+    /** Create missing notes only. Existing googleId matches are left untouched. */
+    createOnly?: boolean;
+}
+
 function slugify(value: string): string {
     const slug = value
         .toLowerCase()
@@ -44,18 +49,18 @@ export class GoogleImporter {
         private readonly settings: () => GoogleSyncSettings,
     ) {}
 
-    async importAll(): Promise<ImportCounts> {
+    async importAll(options: ImportOptions = {}): Promise<ImportCounts> {
         const counts: ImportCounts = { events: 0, tasks: 0, failed: 0 };
-        await this.importEvents(counts);
-        await this.importTasks(counts);
+        await this.importEvents(counts, options);
+        await this.importTasks(counts, options);
         return counts;
     }
 
-    private async importEvents(counts: ImportCounts): Promise<void> {
+    private async importEvents(counts: ImportCounts, options: ImportOptions): Promise<void> {
         const calendarIds = await this.calendarIds();
         for (const calendarId of calendarIds) {
             const { items } = await this.calendar.listEvents(calendarId);
-            for (const event of items) await this.upsertEvent(calendarId, event, counts);
+            for (const event of items) await this.upsertEvent(calendarId, event, counts, options);
         }
     }
 
@@ -72,12 +77,16 @@ export class GoogleImporter {
         calendarId: string,
         event: GoogleEvent,
         counts: ImportCounts,
+        options: ImportOptions,
     ): Promise<void> {
         try {
             if (event.status === "cancelled") return;
             const fm = remoteEventToNote(event, calendarId);
             const existing = await findByGoogleId(this.app, this.settings().eventsFolder, event.id);
-            if (existing) await writeFrontmatter(this.app, existing, fm);
+            if (existing) {
+                if (options.createOnly) return;
+                await writeFrontmatter(this.app, existing, fm);
+            }
             else await upsertMarkdownFile(
                 this.app,
                 pathFor(this.settings().eventsFolder, event.id, event.summary, "event"),
@@ -90,11 +99,11 @@ export class GoogleImporter {
         }
     }
 
-    private async importTasks(counts: ImportCounts): Promise<void> {
+    private async importTasks(counts: ImportCounts, options: ImportOptions): Promise<void> {
         const taskListIds = await this.taskListIds();
         for (const taskListId of taskListIds) {
             const tasks = await this.tasks.listTasks(taskListId);
-            for (const task of tasks) await this.upsertTask(taskListId, task, counts);
+            for (const task of tasks) await this.upsertTask(taskListId, task, counts, options);
         }
     }
 
@@ -107,11 +116,19 @@ export class GoogleImporter {
         return Array.from(new Set(ids));
     }
 
-    private async upsertTask(taskListId: string, task: GoogleTask, counts: ImportCounts): Promise<void> {
+    private async upsertTask(
+        taskListId: string,
+        task: GoogleTask,
+        counts: ImportCounts,
+        options: ImportOptions,
+    ): Promise<void> {
         try {
             const fm = remoteTaskToNote(task, taskListId);
             const existing = await findByGoogleId(this.app, this.settings().tasksFolder, task.id);
-            if (existing) await writeFrontmatter(this.app, existing, fm);
+            if (existing) {
+                if (options.createOnly) return;
+                await writeFrontmatter(this.app, existing, fm);
+            }
             else await upsertMarkdownFile(
                 this.app,
                 pathFor(this.settings().tasksFolder, task.id, task.title, "task"),
