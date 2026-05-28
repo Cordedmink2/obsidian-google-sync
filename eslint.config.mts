@@ -40,6 +40,12 @@ export default defineConfig(
             ],
         },
     },
+    {
+        // Tests hard-delete files for deterministic cleanup; trashFile would litter .trash.
+        files: ["test/**/*.ts"],
+        plugins: { obsidianmd },
+        rules: { "obsidianmd/prefer-file-manager-trash-file": "off" },
+    },
     eslintConfigPrettier,
     globalIgnores([
         "node_modules",
