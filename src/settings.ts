@@ -59,6 +59,12 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
+    hide(): void {
+        // Flush any in-flight debounced save before the tab is torn down so a fast
+        // close-after-typing doesn't lose the last few keystrokes.
+        void this.plugin.flushPendingSettingsSave();
+    }
+
     /**
      * Render a setting as a dropdown when options have been loaded from Google, otherwise a
      * text field plus a "Load from Google" button (which fetches, then re-renders).
@@ -76,14 +82,14 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
                 for (const o of options) d.addOption(o.id, o.label);
                 d.setValue(this.plugin.settings[key]).onChange(async (v) => {
                     this.plugin.settings[key] = v;
-                    await this.plugin.saveSettings();
+                    this.plugin.scheduleSaveSettings();
                 });
             });
         } else {
             setting.addText((t) =>
                 t.setValue(this.plugin.settings[key]).onChange(async (v) => {
                     this.plugin.settings[key] = v;
-                    await this.plugin.saveSettings();
+                    this.plugin.scheduleSaveSettings();
                 }),
             );
             setting.addButton((b) =>
@@ -114,7 +120,7 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
                     .setValue(String(this.plugin.settings[key] ?? ""))
                     .onChange(async (value) => {
                         (this.plugin.settings[key] as unknown) = value;
-                        await this.plugin.saveSettings();
+                        this.plugin.scheduleSaveSettings();
                     }),
             );
     }
@@ -126,7 +132,7 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
             .addToggle((t) =>
                 t.setValue(Boolean(this.plugin.settings[key])).onChange(async (value) => {
                     (this.plugin.settings[key] as unknown) = value;
-                    await this.plugin.saveSettings();
+                    this.plugin.scheduleSaveSettings();
                 }),
             );
     }
@@ -228,7 +234,7 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
                     .onChange(async (value) => {
                         const n = Number(value);
                         this.plugin.settings.autoArchiveDaysPast = Number.isFinite(n) ? n : 1;
-                        await this.plugin.saveSettings();
+                        this.plugin.scheduleSaveSettings();
                     }),
             );
     }
