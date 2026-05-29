@@ -19,6 +19,23 @@ export function eventToGoogle(fm: EventFrontmatter, defaultTz: string): GoogleEv
     if (fm.description != null) ev.description = fm.description;
     if (fm.location != null) ev.location = fm.location;
     if (fm.status != null) ev.status = fm.status;
+    if (fm.visibility != null) ev.visibility = fm.visibility;
+    if (fm.color != null) ev.colorId = fm.color;
+    if (fm.guestsCanInviteOthers != null) ev.guestsCanInviteOthers = fm.guestsCanInviteOthers;
+    if (fm.guestsCanModify != null) ev.guestsCanModify = fm.guestsCanModify;
+    if (fm.guestsCanSeeOtherGuests != null)
+        ev.guestsCanSeeOtherGuests = fm.guestsCanSeeOtherGuests;
+    if (fm.reminders != null) ev.reminders = fm.reminders;
+
+    if (typeof fm.eventType === "string" && fm.eventType.trim() !== "") {
+        ev.extendedProperties = {
+            ...ev.extendedProperties,
+            private: {
+                ...(ev.extendedProperties?.private || {}),
+                obsidianEventType: fm.eventType,
+            },
+        };
+    }
 
     if (fm.date) ev.start = eventDateTime(fm.date, zone, fm.allDay);
     if (fm.end) ev.end = eventDateTime(fm.end, zone, fm.allDay);
@@ -65,6 +82,16 @@ export function remoteEventToNote(event: GoogleEvent, calendarId: string): Event
     if (event.location != null) fm.location = event.location;
     if (event.description != null) fm.description = event.description;
     if (event.status != null) fm.status = event.status;
+    if (event.visibility != null) fm.visibility = event.visibility;
+    if (event.colorId != null) fm.color = event.colorId;
+    if (event.guestsCanInviteOthers != null)
+        fm.guestsCanInviteOthers = event.guestsCanInviteOthers;
+    if (event.guestsCanModify != null) fm.guestsCanModify = event.guestsCanModify;
+    if (event.guestsCanSeeOtherGuests != null)
+        fm.guestsCanSeeOtherGuests = event.guestsCanSeeOtherGuests;
+    if (event.reminders != null) fm.reminders = event.reminders;
+    const remoteEventType = event.extendedProperties?.private?.obsidianEventType;
+    if (remoteEventType != null) fm.eventType = remoteEventType;
     if (event.recurrence?.[0]) fm.recurrence = event.recurrence[0];
 
     const required = event.attendees?.filter((a) => !a.optional).map((a) => a.email) ?? [];
@@ -90,6 +117,13 @@ export const EVENT_MANAGED_KEYS = [
     "location",
     "description",
     "status",
+    "visibility",
+    "color",
+    "guestsCanInviteOthers",
+    "guestsCanModify",
+    "guestsCanSeeOtherGuests",
+    "reminders",
+    "eventType",
     "recurrence",
     "attendees",
 ] as const;

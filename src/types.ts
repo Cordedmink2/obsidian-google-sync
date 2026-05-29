@@ -13,6 +13,13 @@ export interface EventFrontmatter {
     description?: string;
     calendarId?: string;
     status?: string; // confirmed | tentative | cancelled
+    visibility?: string; // default | public | private | confidential
+    eventType?: string; // stored in extendedProperties.private.obsidianEventType
+    color?: string; // Google colorId string
+    guestsCanInviteOthers?: boolean;
+    guestsCanModify?: boolean;
+    guestsCanSeeOtherGuests?: boolean;
+    reminders?: { useDefault?: boolean; overrides?: { method?: string; minutes?: number }[] };
     attendees?: { required?: string[]; optional?: string[] };
     recurrence?: string; // single RRULE line
     googleId?: string; // filled by the plugin after insert
@@ -51,6 +58,13 @@ export interface GoogleEvent {
     description?: string;
     location?: string;
     status?: string;
+    visibility?: string;
+    colorId?: string;
+    guestsCanInviteOthers?: boolean;
+    guestsCanModify?: boolean;
+    guestsCanSeeOtherGuests?: boolean;
+    reminders?: { useDefault?: boolean; overrides?: { method?: string; minutes?: number }[] };
+    extendedProperties?: { private?: Record<string, string>; shared?: Record<string, string> };
     start?: GoogleEventDateTime;
     end?: GoogleEventDateTime;
     attendees?: GoogleEventAttendee[];

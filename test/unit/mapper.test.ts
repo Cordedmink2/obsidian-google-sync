@@ -1,6 +1,11 @@
 import { describe, it } from "mocha";
 import { expect } from "chai";
-import { eventToGoogle, mergeManagedFrontmatter, taskToGoogle } from "../../src/sync/mapper";
+import {
+    eventToGoogle,
+    mergeManagedFrontmatter,
+    remoteEventToNote,
+    taskToGoogle,
+} from "../../src/sync/mapper";
 import { EventFrontmatter, TaskFrontmatter } from "../../src/types";
 
 const NZ = "Pacific/Auckland";
@@ -15,6 +20,16 @@ describe("eventToGoogle", () => {
             location: "Zoom",
             description: "Daily sync.",
             status: "confirmed",
+            visibility: "private",
+            color: "7",
+            eventType: "meeting",
+            guestsCanInviteOthers: true,
+            guestsCanModify: false,
+            guestsCanSeeOtherGuests: true,
+            reminders: {
+                useDefault: false,
+                overrides: [{ method: "popup", minutes: 10 }],
+            },
             recurrence: "RRULE:FREQ=WEEKLY;BYDAY=MO",
             attendees: { required: ["a@x.com"], optional: ["b@x.com"] },
         };
@@ -25,6 +40,16 @@ describe("eventToGoogle", () => {
         expect(ev.end?.dateTime).to.equal("2026-06-02T09:15:00+12:00");
         expect(ev.location).to.equal("Zoom");
         expect(ev.status).to.equal("confirmed");
+        expect(ev.visibility).to.equal("private");
+        expect(ev.colorId).to.equal("7");
+        expect(ev.guestsCanInviteOthers).to.equal(true);
+        expect(ev.guestsCanModify).to.equal(false);
+        expect(ev.guestsCanSeeOtherGuests).to.equal(true);
+        expect(ev.reminders).to.deep.equal({
+            useDefault: false,
+            overrides: [{ method: "popup", minutes: 10 }],
+        });
+        expect(ev.extendedProperties?.private?.obsidianEventType).to.equal("meeting");
         expect(ev.recurrence).to.deep.equal(["RRULE:FREQ=WEEKLY;BYDAY=MO"]);
         expect(ev.attendees).to.deep.equal([
             { email: "a@x.com" },
@@ -47,6 +72,33 @@ describe("eventToGoogle", () => {
         const ev = eventToGoogle({ title: "X", date: "2026-06-02T09:00:00", timezone: NZ }, "UTC");
         expect(ev.attendees).to.equal(undefined);
         expect(ev.recurrence).to.equal(undefined);
+    });
+});
+
+describe("remoteEventToNote", () => {
+    it("maps extended event fields back into frontmatter", () => {
+        const fm = remoteEventToNote(
+            {
+                id: "evt_123",
+                summary: "Planning",
+                visibility: "private",
+                colorId: "9",
+                guestsCanInviteOthers: false,
+                guestsCanModify: false,
+                guestsCanSeeOtherGuests: true,
+                reminders: { useDefault: true },
+                extendedProperties: { private: { obsidianEventType: "deep-work" } },
+            },
+            "primary",
+        );
+        expect(fm.googleId).to.equal("evt_123");
+        expect(fm.visibility).to.equal("private");
+        expect(fm.color).to.equal("9");
+        expect(fm.guestsCanInviteOthers).to.equal(false);
+        expect(fm.guestsCanModify).to.equal(false);
+        expect(fm.guestsCanSeeOtherGuests).to.equal(true);
+        expect(fm.reminders).to.deep.equal({ useDefault: true });
+        expect(fm.eventType).to.equal("deep-work");
     });
 });
 
