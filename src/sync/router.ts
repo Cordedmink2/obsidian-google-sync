@@ -1,11 +1,12 @@
 import { App, Notice, TAbstractFile, TFile, TFolder, normalizePath } from "obsidian";
 import { GoogleSyncSettings } from "../settings";
-import { GoogleCalendarClient } from "../google/calendar";
+import { GoogleCalendarClient, WriteEventOptions } from "../google/calendar";
 import { GoogleTasksClient } from "../google/tasks";
 import { detectKind, isManagedSubpath, validateEvent, validateTask } from "./frontmatter";
 import { eventToGoogle, taskToGoogle } from "./mapper";
+import { linkToBasename } from "./lifecycle-plan";
 import { readFrontmatter, writeFrontmatterKey } from "../io";
-import { NoteKind } from "../types";
+import { EventFrontmatter, GoogleEvent, NoteKind } from "../types";
 
 interface RemoteRef {
     kind: NoteKind;
@@ -76,18 +77,21 @@ export class SyncRouter {
         const s = this.settings();
         const calendarId = v.value.calendarId || s.defaultCalendarId;
         const body = eventToGoogle(v.value, s.defaultTimezone);
+        const opts = this.eventWriteOptions(v.value, body);
         if (v.value.googleId) {
-            await this.calendar.patchEvent(calendarId, v.value.googleId, body);
+            const patched = await this.calendar.patchEvent(calendarId, v.value.googleId, body, opts);
+            await this.writeMeetLinkBack(file, v.value, patched);
             this.index.set(file.path, {
                 kind: "event",
                 googleId: v.value.googleId,
                 container: calendarId,
             });
         } else {
-            const created = await this.calendar.insertEvent(calendarId, body);
+            const created = await this.calendar.insertEvent(calendarId, body, opts);
             if (created.id) {
                 await writeFrontmatterKey(this.app, file, "googleId", created.id);
                 this.onTouch(file.path);
+                await this.writeMeetLinkBack(file, v.value, created);
                 this.index.set(file.path, {
                     kind: "event",
                     googleId: created.id,
@@ -95,6 +99,45 @@ export class SyncRouter {
                 });
             }
         }
+    }
+
+    /**
+     * Derive insert/patch query params from the event, and — when the note asks for a
+     * Google Meet link it doesn't have yet — attach a conferenceData create request.
+     */
+    private eventWriteOptions(value: EventFrontmatter, body: GoogleEvent): WriteEventOptions {
+        const opts: WriteEventOptions = {};
+        const wantsMeet = value.conferencing === true || value.conferencing === "hangoutsMeet";
+        if (wantsMeet && !value.meetLink) {
+            body.conferenceData = {
+                createRequest: {
+                    requestId: crypto.randomUUID(),
+                    conferenceSolutionKey: { type: "hangoutsMeet" },
+                },
+            };
+            opts.conferenceDataVersion = 1;
+        } else if (value.meetLink || value.conferencing) {
+            // Ask Google to round-trip existing conference data on update.
+            opts.conferenceDataVersion = 1;
+        }
+        if (Array.isArray(body.attachments) && body.attachments.length) {
+            opts.supportsAttachments = true;
+        }
+        return opts;
+    }
+
+    /** Persist a newly minted Meet link back into the note (managed, read-only). */
+    private async writeMeetLinkBack(
+        file: TFile,
+        value: EventFrontmatter,
+        result: GoogleEvent,
+    ): Promise<void> {
+        const link =
+            result.hangoutLink ??
+            result.conferenceData?.entryPoints?.find((e) => e.entryPointType === "video")?.uri;
+        if (!link || value.meetLink === link) return;
+        await writeFrontmatterKey(this.app, file, "meetLink", link);
+        this.onTouch(file.path);
     }
 
     private async syncTask(file: TFile, fm: Record<string, unknown>): Promise<void> {
@@ -110,15 +153,22 @@ export class SyncRouter {
             return;
         }
         const body = taskToGoogle(v.value, s.defaultTimezone);
+        const parentId = this.resolveParentGoogleId(v.value.parent, file.path);
         if (v.value.googleId) {
             await this.tasks.patchTask(taskListId, v.value.googleId, body);
+            // parent can't be changed via patch — move handles (re)nesting.
+            if (parentId) await this.tasks.moveTask(taskListId, v.value.googleId, { parent: parentId });
             this.index.set(file.path, {
                 kind: "task",
                 googleId: v.value.googleId,
                 container: taskListId,
             });
         } else {
-            const created = await this.tasks.insertTask(taskListId, body);
+            const created = await this.tasks.insertTask(
+                taskListId,
+                body,
+                parentId ? { parent: parentId } : {},
+            );
             if (created.id) {
                 await writeFrontmatterKey(this.app, file, "googleId", created.id);
                 this.onTouch(file.path);
@@ -129,6 +179,22 @@ export class SyncRouter {
                 });
             }
         }
+    }
+
+    /**
+     * Resolve a task note's `parent` wikilink/basename to the parent task's Google id,
+     * so it can be nested as a subtask. Returns undefined when there's no parent, the
+     * link doesn't resolve, or the parent hasn't been pushed to Google yet (no googleId).
+     */
+    private resolveParentGoogleId(parent: unknown, fromPath: string): string | undefined {
+        if (typeof parent !== "string" || parent.trim() === "") return undefined;
+        const dest = this.app.metadataCache.getFirstLinkpathDest(
+            linkToBasename(parent),
+            fromPath,
+        );
+        if (!dest) return undefined;
+        const gid: unknown = this.app.metadataCache.getFileCache(dest)?.frontmatter?.googleId;
+        return typeof gid === "string" && gid ? gid : undefined;
     }
 
     /** Delete the Google object for a (now-removed) note path, if we know its id. */

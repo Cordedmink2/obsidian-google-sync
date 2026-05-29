@@ -83,23 +83,34 @@ export async function codeChallenge(verifier: string): Promise<string> {
     return base64url(new Uint8Array(digest));
 }
 
-export async function buildAuthUrl(
+/** Build the consent URL from an already-computed PKCE challenge. Synchronous,
+ * so it can run inside an iOS user-gesture (where window.open must be called
+ * without any intervening await). */
+export function buildAuthUrlWithChallenge(
     config: OAuthConfig,
-    verifier: string,
+    challenge: string,
     state: string,
-): Promise<string> {
+): string {
     const params = new URLSearchParams({
         client_id: config.clientId,
         redirect_uri: config.redirectUri,
         response_type: "code",
         scope: config.scopes.join(" "),
-        code_challenge: await codeChallenge(verifier),
+        code_challenge: challenge,
         code_challenge_method: "S256",
         state,
         access_type: "offline",
         prompt: "consent",
     });
     return `${AUTH_URL}?${params.toString()}`;
+}
+
+export async function buildAuthUrl(
+    config: OAuthConfig,
+    verifier: string,
+    state: string,
+): Promise<string> {
+    return buildAuthUrlWithChallenge(config, await codeChallenge(verifier), state);
 }
 
 interface TokenResponse {
@@ -194,7 +205,7 @@ const EXPIRY_SKEW_MS = 60_000;
 
 /** Stateful OAuth manager: drives the auth handshake and hands out fresh access tokens. */
 export class GoogleAuth {
-    private pending?: { verifier: string; state: string };
+    private pending?: { verifier: string; state: string; challenge?: string };
 
     constructor(
         private readonly http: HttpFn,
@@ -208,9 +219,45 @@ export class GoogleAuth {
     async beginAuth(): Promise<{ url: string; state: string }> {
         const verifier = generateCodeVerifier();
         const state = generateState();
-        this.pending = { verifier, state };
-        const url = await buildAuthUrl(this.config(), verifier, state);
+        const challenge = await codeChallenge(verifier);
+        this.pending = { verifier, state, challenge };
+        const url = buildAuthUrlWithChallenge(this.config(), challenge, state);
         return { url, state };
+    }
+
+    /**
+     * Pre-compute PKCE material (the async part of beginAuth) so the consent URL
+     * can later be built synchronously via {@link authUrlFromPrepared}. iOS only
+     * honours window.open during the synchronous user-gesture stack, so the
+     * settings tab calls this ahead of the click.
+     */
+    async prepare(): Promise<void> {
+        // Idempotent: keep any existing material (it may belong to an in-flight
+        // handshake, and the consent URL reads fresh config at build time anyway).
+        if (this.pending?.challenge) return;
+        const verifier = generateCodeVerifier();
+        const state = generateState();
+        const challenge = await codeChallenge(verifier);
+        // Re-check after the async digest — a concurrent beginAuth()/prepare() may have
+        // set pending while we were hashing; don't clobber its verifier/state.
+        if (this.pending?.challenge) return;
+        this.pending = { verifier, state, challenge };
+    }
+
+    /** True once {@link prepare} has stashed a challenge ready for a sync open. */
+    isPrepared(): boolean {
+        return !!this.pending?.challenge;
+    }
+
+    /** Synchronously build the consent URL from prepared material. Gesture-safe. */
+    authUrlFromPrepared(): { url: string; state: string } {
+        if (!this.pending?.challenge) throw new Error("No prepared auth");
+        const url = buildAuthUrlWithChallenge(
+            this.config(),
+            this.pending.challenge,
+            this.pending.state,
+        );
+        return { url, state: this.pending.state };
     }
 
     /** Called by the obsidian:// handler. Verifies state, exchanges code, persists tokens. */

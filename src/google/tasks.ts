@@ -66,11 +66,42 @@ export class GoogleTasksClient {
         return items;
     }
 
-    async insertTask(taskListId: string, task: GoogleTask): Promise<GoogleTask> {
+    /**
+     * Create a task. The `parent`/`previous` options nest it as a subtask and/or
+     * position it — the Tasks API only honours these as query params, never in the
+     * request body, so they're passed separately.
+     */
+    async insertTask(
+        taskListId: string,
+        task: GoogleTask,
+        options: { parent?: string; previous?: string } = {},
+    ): Promise<GoogleTask> {
         return (await this.call({
             method: "POST",
-            url: `${BASE}/lists/${enc(taskListId)}/tasks`,
+            url: addQuery(`${BASE}/lists/${enc(taskListId)}/tasks`, {
+                parent: options.parent,
+                previous: options.previous,
+            }),
             body: task,
+        })) as GoogleTask;
+    }
+
+    /**
+     * Reparent and/or reposition an existing task. `parent` nests it under another
+     * task (omit to promote to top level); `previous` is the sibling it follows.
+     * This is the only endpoint that can change a task's parent.
+     */
+    async moveTask(
+        taskListId: string,
+        taskId: string,
+        options: { parent?: string; previous?: string } = {},
+    ): Promise<GoogleTask> {
+        return (await this.call({
+            method: "POST",
+            url: addQuery(`${BASE}/lists/${enc(taskListId)}/tasks/${enc(taskId)}/move`, {
+                parent: options.parent,
+                previous: options.previous,
+            }),
         })) as GoogleTask;
     }
 

@@ -98,6 +98,11 @@ export default class GoogleSyncPlugin extends Plugin {
             // got archived until the next day.
             void this.importOnStartup().finally(() => void this.maybeRunLifecycle());
         });
+
+        // Pre-build the OAuth consent URL so Connect (including from the command
+        // palette, which never opens settings) can open the browser synchronously
+        // inside the tap — iOS blocks a post-await window.open.
+        this.prepareConnect();
     }
 
     onunload(): void {
@@ -180,18 +185,37 @@ export default class GoogleSyncPlugin extends Plugin {
 
     // ---- public API used by settings tab + commands ----
 
+    /**
+     * Pre-build the PKCE material so {@link connect} can open the browser
+     * synchronously inside the click. iOS (Obsidian mobile) only honours
+     * window.open during the user-gesture call stack, so we can't await here.
+     * Called from the settings render; only touches in-memory auth state.
+     */
+    prepareConnect(): void {
+        if (!this.settings.clientId || !this.settings.redirectUri) return;
+        void this.auth.prepare();
+    }
+
     async connect(): Promise<void> {
         if (!this.settings.clientId || !this.settings.redirectUri) {
             new Notice("Set the OAuth client ID and redirect URL in settings first.");
             return;
         }
-        const { url } = await this.auth.beginAuth();
+        // Open the consent page synchronously when settings pre-built the PKCE
+        // material — iOS blocks window.open once we await. The await branch is the
+        // desktop / not-yet-prepared fallback (Electron has no gesture rule).
+        const { url } = this.auth.isPrepared()
+            ? this.auth.authUrlFromPrepared()
+            : await this.auth.beginAuth();
         window.open(url, "_blank");
         new Notice("Continue in your browser, then return to Obsidian.");
     }
 
     async disconnect(): Promise<void> {
         await this.auth.signOut();
+        // signOut clears the prepared PKCE material — rebuild it so the next
+        // Connect still opens synchronously on iOS.
+        this.prepareConnect();
         new Notice("Disconnected from Google.");
     }
 
@@ -413,6 +437,9 @@ export default class GoogleSyncPlugin extends Plugin {
             new Notice("Connected to Google.");
         } catch (e) {
             new Notice(`Google auth failed: ${(e as Error).message}`);
+        } finally {
+            // completeAuth consumed the prepared material — rebuild for a future reconnect.
+            this.prepareConnect();
         }
     }
 

@@ -150,6 +150,7 @@ location: Wellington
 description: Catch-up about Q3 plan
 status: confirmed
 visibility: default
+transparency: opaque # opaque = busy, transparent = free
 eventType: meeting
 color: "7" # Google Calendar colorId (1-11)
 guestsCanInviteOthers: true
@@ -165,9 +166,37 @@ attendees:
         - alex@example.com
     optional:
         -
+recurrence: RRULE:FREQ=WEEKLY;BYDAY=MO # or a YAML list of RRULE/EXDATE/RDATE lines
 ---
 Notes for myself stay here, in Obsidian.
 ```
+
+`recurrence` accepts either a single rule string or a YAML list when you need exceptions, e.g.:
+
+```yaml
+recurrence:
+    - RRULE:FREQ=WEEKLY;BYDAY=MO
+    - EXDATE;TZID=Pacific/Auckland:20260615T100000
+```
+
+### More event fields
+
+- **Google Meet:** add `conferencing: true` and the plugin asks Google to create a Meet link on the next sync, then writes the resolved URL back into a read-only `meetLink` field.
+- **Detailed attendees:** instead of the `required`/`optional` email lists, you can use a YAML list of objects to see and set response status, names, organizer/resource flags. Imported events use this richer form automatically when Google sends that detail:
+
+    ```yaml
+    attendees:
+        - email: alex@example.com
+          displayName: Alex
+          responseStatus: accepted # needsAction | declined | tentative | accepted
+          organizer: true
+        - email: room-3@resource.calendar.google.com
+          resource: true
+    ```
+
+- **Attachments:** a `attachments` list of `{ fileUrl, title, mimeType }` (Google requires Drive file URLs).
+- **Source:** a `source: { title, url }` linking the event back to where it came from.
+- **transparency:** `opaque` (busy) or `transparent` (free).
 
 After syncing, the plugin writes a `googleId` field into the frontmatter. Leave that field alone; it is how the plugin knows which Google event belongs to the note.
 
@@ -178,13 +207,27 @@ Create a Markdown file under `tasks/`:
 ```yaml
 ---
 title: Buy milk
-due: 2026-06-01
+due: 2026-06-01 # deadline (Google Tasks honours the date only)
 completed: false
+notes: 2% organic, two cartons # the task's details/notes in Google Tasks
 ---
-Optional task notes go here.
+Free-form note body stays in Obsidian and is not synced.
 ```
 
-Set `completed: true` and sync to mark the task completed in Google Tasks. With **Auto-archive past events** on, completing a task also files it into `tasks/completed/` straight away — you no longer have to wait for the periodic lifecycle scan.
+`notes` maps to the native Google Tasks **details** field (the body of the note is kept locally and not synced). `due` maps to the native **deadline**. Set `completed: true` and sync to mark the task completed in Google Tasks. With **Auto-archive past events** on, completing a task also files it into `tasks/completed/` straight away — you no longer have to wait for the periodic lifecycle scan.
+
+### Subtasks
+
+Google Tasks supports one level of nesting. To make a task a subtask, add a `parent` wikilink pointing at the parent task note:
+
+```yaml
+---
+title: Pick up the car
+parent: "[[Renew registration]]"
+---
+```
+
+On sync the plugin nests it under the parent in Google Tasks (the parent must have synced at least once so it has a `googleId`). Subtasks imported from Google get their `parent` wikilink written back automatically.
 
 ## Linking tasks to events
 

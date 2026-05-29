@@ -23,6 +23,21 @@ export interface ListEventsResult {
     nextSyncToken?: string;
 }
 
+/** Write-time toggles that map to query params on insert/patch. */
+export interface WriteEventOptions {
+    conferenceDataVersion?: number; // 1 = let Google create/return Meet conference data
+    supportsAttachments?: boolean; // required when sending `attachments`
+    sendUpdates?: string; // all | externalOnly | none
+}
+
+function writeQuery(o: WriteEventOptions): Record<string, string | number | boolean | undefined> {
+    return {
+        conferenceDataVersion: o.conferenceDataVersion,
+        supportsAttachments: o.supportsAttachments,
+        sendUpdates: o.sendUpdates,
+    };
+}
+
 function addQuery(
     url: string,
     params: Record<string, string | number | boolean | undefined>,
@@ -46,10 +61,14 @@ export class GoogleCalendarClient {
         return apiCall(this.http, this.getToken, this.retry, c);
     }
 
-    async insertEvent(calendarId: string, event: GoogleEvent): Promise<GoogleEvent> {
+    async insertEvent(
+        calendarId: string,
+        event: GoogleEvent,
+        options: WriteEventOptions = {},
+    ): Promise<GoogleEvent> {
         return (await this.call({
             method: "POST",
-            url: `${BASE}/calendars/${enc(calendarId)}/events`,
+            url: addQuery(`${BASE}/calendars/${enc(calendarId)}/events`, writeQuery(options)),
             body: event,
         })) as GoogleEvent;
     }
@@ -58,10 +77,14 @@ export class GoogleCalendarClient {
         calendarId: string,
         eventId: string,
         patch: Partial<GoogleEvent>,
+        options: WriteEventOptions = {},
     ): Promise<GoogleEvent> {
         return (await this.call({
             method: "PATCH",
-            url: `${BASE}/calendars/${enc(calendarId)}/events/${enc(eventId)}`,
+            url: addQuery(
+                `${BASE}/calendars/${enc(calendarId)}/events/${enc(eventId)}`,
+                writeQuery(options),
+            ),
             body: patch,
         })) as GoogleEvent;
     }

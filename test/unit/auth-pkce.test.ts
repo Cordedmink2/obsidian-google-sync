@@ -186,6 +186,44 @@ describe("GoogleAuth", () => {
         expect(mem.get()).to.equal(null);
     });
 
+    it("prepare() builds a consent URL synchronously that completeAuth accepts", async () => {
+        const mem = memStore(null);
+        const { fn } = fakeHttp([jsonResp(200, { access_token: "at", expires_in: 3600 })]);
+        const auth = new GoogleAuth(
+            fn,
+            () => config,
+            mem.store,
+            () => 0,
+            noWaitRetry,
+        );
+        expect(auth.isPrepared()).to.equal(false);
+        await auth.prepare();
+        expect(auth.isPrepared()).to.equal(true);
+
+        // Synchronous (no await) — this is what runs inside the iOS user-gesture.
+        const { url, state } = auth.authUrlFromPrepared();
+        expect(url).to.contain("code_challenge=");
+        expect(url).to.contain("code_challenge_method=S256");
+        expect(new URL(url).searchParams.get("state")).to.equal(state);
+
+        // The PKCE verifier behind that challenge still completes the handshake.
+        await auth.completeAuth("the-code", state);
+        expect(mem.get()?.accessToken).to.equal("at");
+    });
+
+    it("prepare() is idempotent — a second call keeps the same state", async () => {
+        const auth = new GoogleAuth(fakeHttp().fn, () => config, memStore().store, () => 0);
+        await auth.prepare();
+        const first = auth.authUrlFromPrepared().state;
+        await auth.prepare();
+        expect(auth.authUrlFromPrepared().state).to.equal(first);
+    });
+
+    it("authUrlFromPrepared() throws when nothing was prepared", () => {
+        const auth = new GoogleAuth(fakeHttp().fn, () => config, memStore().store, () => 0);
+        expect(() => auth.authUrlFromPrepared()).to.throw(/prepared/i);
+    });
+
     it("completes auth and stores tokens on matching state", async () => {
         const mem = memStore(null);
         const { fn } = fakeHttp([

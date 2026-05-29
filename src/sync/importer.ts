@@ -38,6 +38,11 @@ function basePathFor(
     return normalizePath(`${folder}/${titlePart}-${idPart}.md`);
 }
 
+/** The note name (no folder, no .md) for a vault path. */
+function basenameOf(path: string): string {
+    return (path.split("/").pop() ?? path).replace(/\.md$/i, "");
+}
+
 async function unusedPath(app: App, preferredPath: string): Promise<string> {
     const normalized = normalizePath(preferredPath);
     if (!app.vault.getAbstractFileByPath(normalized)) return normalized;
@@ -198,7 +203,22 @@ export class GoogleImporter {
         const taskListIds = await this.taskListIds();
         for (const taskListId of taskListIds) {
             const tasks = await this.tasks.listTasks(taskListId);
-            for (const task of tasks) await this.upsertTask(taskListId, task, counts, options);
+            // Google lists subtasks after their parent (position order), so a map of
+            // already-seen id -> note basename lets a subtask link back to its parent.
+            const basenameById = new Map<string, string>();
+            for (const task of tasks) {
+                const parentBasename = task.parent
+                    ? basenameById.get(task.parent)
+                    : undefined;
+                const basename = await this.upsertTask(
+                    taskListId,
+                    task,
+                    counts,
+                    options,
+                    parentBasename,
+                );
+                if (task.id && basename) basenameById.set(task.id, basename);
+            }
         }
     }
 
@@ -211,17 +231,19 @@ export class GoogleImporter {
         return Array.from(new Set(ids));
     }
 
+    /** Returns the note basename (without extension) so subtasks can link to it. */
     private async upsertTask(
         taskListId: string,
         task: GoogleTask,
         counts: ImportCounts,
         options: ImportOptions,
-    ): Promise<void> {
+        parentBasename?: string,
+    ): Promise<string | undefined> {
         try {
-            const fm = remoteTaskToNote(task, taskListId);
+            const fm = remoteTaskToNote(task, taskListId, parentBasename);
             const existing = await findByGoogleId(this.app, this.settings().tasksFolder, task.id);
             if (existing) {
-                if (options.createOnly) return;
+                if (options.createOnly) return existing.basename;
                 const merged = mergeManagedFrontmatter(
                     await readFrontmatter(this.app, existing),
                     fm,
@@ -229,21 +251,24 @@ export class GoogleImporter {
                 );
                 await writeFrontmatter(this.app, existing, merged);
                 this.onTouch(existing.path);
-            } else {
-                const path = await pathFor(
-                    this.app,
-                    this.settings().tasksFolder,
-                    task.id,
-                    task.title,
-                    "task",
-                );
-                await upsertMarkdownFile(this.app, path, fm);
-                this.onTouch(path);
+                counts.tasks++;
+                return existing.basename;
             }
+            const path = await pathFor(
+                this.app,
+                this.settings().tasksFolder,
+                task.id,
+                task.title,
+                "task",
+            );
+            await upsertMarkdownFile(this.app, path, fm);
+            this.onTouch(path);
             counts.tasks++;
+            return basenameOf(path);
         } catch (e) {
             counts.failed++;
             console.error("[google-sync] failed to import task", task.id, e);
+            return undefined;
         }
     }
 }

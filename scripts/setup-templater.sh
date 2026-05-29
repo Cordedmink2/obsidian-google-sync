@@ -49,6 +49,7 @@ location:
 description:
 status: confirmed
 visibility: default
+transparency: opaque # opaque = busy, transparent = free
 eventType: meeting
 color: # Google Calendar colorId (1-11)
 guestsCanInviteOthers: true
@@ -77,6 +78,8 @@ if [[ ! -f "$TASK_TEMPLATE" ]]; then
 title: <% tp.file.title %>
 due: <% tp.date.now("YYYY-MM-DD") %>
 completed: false
+notes: # task details synced to Google Tasks
+parent: # optional "[[Parent task]]" wikilink to nest as a subtask
 ---
 
 Notes:

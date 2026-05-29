@@ -42,6 +42,32 @@ describe("GoogleCalendarClient", () => {
         expect(calls[0]?.url).to.contain("/events/ev1");
     });
 
+    it("passes conferenceDataVersion and supportsAttachments query params on insert", async () => {
+        const { calls, fn } = fakeHttp([jsonResp(200, { id: "ev1" })]);
+        const client = new GoogleCalendarClient(fn, token, noWaitRetry);
+        await client.insertEvent(
+            "primary",
+            { summary: "Call" },
+            { conferenceDataVersion: 1, supportsAttachments: true },
+        );
+        expect(calls[0]?.url).to.equal(
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&supportsAttachments=true",
+        );
+    });
+
+    it("passes conferenceDataVersion on patch and omits unset query params", async () => {
+        const { calls, fn } = fakeHttp([jsonResp(200, { id: "ev1" }), jsonResp(200, { id: "ev1" })]);
+        const client = new GoogleCalendarClient(fn, token, noWaitRetry);
+        await client.patchEvent("primary", "ev1", {}, { conferenceDataVersion: 1 });
+        expect(calls[0]?.url).to.equal(
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events/ev1?conferenceDataVersion=1",
+        );
+        await client.patchEvent("primary", "ev1", { location: "B" });
+        expect(calls[1]?.url).to.equal(
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events/ev1",
+        );
+    });
+
     it("deletes an event (handles empty 204)", async () => {
         const { calls, fn } = fakeHttp([emptyResp(204)]);
         const client = new GoogleCalendarClient(fn, token, noWaitRetry);

@@ -46,6 +46,39 @@ describe("event sync against mocked Google", function () {
         expect(body.start).to.not.equal(undefined);
     });
 
+    it("requests a Meet link for conferencing:true and writes meetLink back", async () => {
+        const meetLink = await browser.executeObsidian(async ({ app, obsidian }) => {
+            const plugin = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
+                .plugins.plugins["google-sync"] as { syncNow(): Promise<void> };
+            if (!app.vault.getAbstractFileByPath("events")) await app.vault.createFolder("events");
+            const path = "events/call.md";
+            const old = app.vault.getAbstractFileByPath(path);
+            if (old instanceof obsidian.TFile) await app.vault.delete(old);
+            await app.vault.create(
+                path,
+                "---\ntitle: Call\ndate: 2026-06-04T09:00:00\ntimezone: Pacific/Auckland\nconferencing: true\n---\n",
+            );
+            await plugin.syncNow();
+            const file = app.vault.getAbstractFileByPath(path);
+            if (!(file instanceof obsidian.TFile)) return null;
+            const content = await app.vault.read(file);
+            const m = content.match(/meetLink:\s*"?([^"\n]+)"?/);
+            return m ? m[1] : null;
+        });
+
+        const calls = await getMockCalls();
+        const insert = calls.find(
+            (c: MockCall) =>
+                c.method === "POST" &&
+                c.url.includes("/events?") &&
+                c.url.includes("conferenceDataVersion=1"),
+        );
+        if (!insert) throw new Error("no conferencing insert recorded");
+        const body = JSON.parse(insert.body ?? "{}") as { conferenceData?: { createRequest?: unknown } };
+        expect(body.conferenceData?.createRequest).to.not.equal(undefined);
+        expect(meetLink).to.equal("https://meet.google.com/e2e-link");
+    });
+
     it("patches an existing event (note already has googleId)", async () => {
         await browser.executeObsidian(async ({ app, obsidian }) => {
             const plugin = (app as unknown as { plugins: { plugins: Record<string, unknown> } })

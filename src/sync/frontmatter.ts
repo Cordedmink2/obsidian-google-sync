@@ -63,6 +63,7 @@ export function validateTask(fm: Record<string, unknown>): ValidationResult<Task
     if (fm.completed != null && typeof fm.completed !== "boolean") {
         errors.push("`completed` must be a boolean");
     }
+    if (fm.parent != null && typeof fm.parent !== "string") errors.push("`parent` must be a string");
     if (errors.length) return { ok: false, errors };
     return { ok: true, value: fm as TaskFrontmatter, errors: [] };
 }

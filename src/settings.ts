@@ -216,6 +216,9 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
         // Obsidian 1.12.x's renderer (100% CPU loop). isConnectedSync reads the
         // in-memory token field directly so no await is needed.
         const connected = this.plugin.isConnectedSync();
+        // Pre-build the OAuth consent URL so Connect can open the browser
+        // synchronously inside the click — iOS blocks a post-await window.open.
+        this.plugin.prepareConnect();
         new Setting(containerEl)
             .setName("Connection")
             .setDesc(connected ? "Connected to Google." : "Not connected.")

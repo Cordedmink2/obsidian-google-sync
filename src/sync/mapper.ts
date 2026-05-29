@@ -1,4 +1,5 @@
 import {
+    EventAttendee,
     EventFrontmatter,
     GoogleEvent,
     GoogleEventAttendee,
@@ -6,6 +7,47 @@ import {
     TaskFrontmatter,
 } from "../types";
 import { allDayEnd, eventDateTime, taskDue } from "./dates";
+
+/** Optional attendee fields beyond email/optional, copied verbatim in both directions. */
+const ATTENDEE_EXTRA_KEYS = [
+    "displayName",
+    "organizer",
+    "resource",
+    "responseStatus",
+    "comment",
+    "additionalGuests",
+] as const;
+
+/** Convert either attendee frontmatter shape into Google's attendee array. */
+function attendeesToGoogle(attendees: EventFrontmatter["attendees"]): GoogleEventAttendee[] {
+    if (!attendees) return [];
+    if (Array.isArray(attendees)) {
+        return attendees
+            .filter((a): a is EventAttendee => !!a && typeof a.email === "string" && a.email !== "")
+            .map((a) => {
+                const out: GoogleEventAttendee = { email: a.email };
+                if (a.optional != null) out.optional = a.optional;
+                for (const k of ATTENDEE_EXTRA_KEYS) {
+                    if (a[k] != null) (out[k] as unknown) = a[k];
+                }
+                return out;
+            });
+    }
+    const out: GoogleEventAttendee[] = [];
+    for (const email of attendees.required ?? []) out.push({ email });
+    for (const email of attendees.optional ?? []) out.push({ email, optional: true });
+    return out;
+}
+
+function attendeeHasMetadata(a: GoogleEventAttendee): boolean {
+    return ATTENDEE_EXTRA_KEYS.some((k) => a[k] != null);
+}
+
+/** The Google Meet (or other video) link buried in an event's conference data. */
+function videoLink(event: GoogleEvent): string | undefined {
+    if (event.hangoutLink) return event.hangoutLink;
+    return event.conferenceData?.entryPoints?.find((e) => e.entryPointType === "video")?.uri;
+}
 
 /**
  * Map an event note's frontmatter to a Google Calendar event body. Pure; throws
@@ -20,6 +62,7 @@ export function eventToGoogle(fm: EventFrontmatter, defaultTz: string): GoogleEv
     if (fm.location != null) ev.location = fm.location;
     if (fm.status != null) ev.status = fm.status;
     if (fm.visibility != null) ev.visibility = fm.visibility;
+    if (fm.transparency != null) ev.transparency = fm.transparency;
     if (fm.color != null) ev.colorId = fm.color;
     if (fm.guestsCanInviteOthers != null) ev.guestsCanInviteOthers = fm.guestsCanInviteOthers;
     if (fm.guestsCanModify != null) ev.guestsCanModify = fm.guestsCanModify;
@@ -41,12 +84,19 @@ export function eventToGoogle(fm: EventFrontmatter, defaultTz: string): GoogleEv
     if (fm.end) ev.end = eventDateTime(fm.end, zone, fm.allDay);
     else if (fm.allDay && fm.date) ev.end = allDayEnd(fm.date, zone);
 
-    const attendees: GoogleEventAttendee[] = [];
-    for (const email of fm.attendees?.required ?? []) attendees.push({ email });
-    for (const email of fm.attendees?.optional ?? []) attendees.push({ email, optional: true });
+    const attendees = attendeesToGoogle(fm.attendees);
     if (attendees.length) ev.attendees = attendees;
 
-    if (fm.recurrence) ev.recurrence = [fm.recurrence];
+    if (Array.isArray(fm.attachments) && fm.attachments.length) ev.attachments = fm.attachments;
+    if (fm.source != null) ev.source = fm.source;
+
+    // Recurrence is one or more RRULE/EXDATE/RDATE lines; accept a bare string too.
+    if (fm.recurrence) {
+        const lines = (Array.isArray(fm.recurrence) ? fm.recurrence : [fm.recurrence]).filter(
+            (l): l is string => typeof l === "string" && l.trim() !== "",
+        );
+        if (lines.length) ev.recurrence = lines;
+    }
 
     return ev;
 }
@@ -83,6 +133,7 @@ export function remoteEventToNote(event: GoogleEvent, calendarId: string): Event
     if (event.description != null) fm.description = event.description;
     if (event.status != null) fm.status = event.status;
     if (event.visibility != null) fm.visibility = event.visibility;
+    if (event.transparency != null) fm.transparency = event.transparency;
     if (event.colorId != null) fm.color = event.colorId;
     if (event.guestsCanInviteOthers != null)
         fm.guestsCanInviteOthers = event.guestsCanInviteOthers;
@@ -92,11 +143,34 @@ export function remoteEventToNote(event: GoogleEvent, calendarId: string): Event
     if (event.reminders != null) fm.reminders = event.reminders;
     const remoteEventType = event.extendedProperties?.private?.obsidianEventType;
     if (remoteEventType != null) fm.eventType = remoteEventType;
-    if (event.recurrence?.[0]) fm.recurrence = event.recurrence[0];
+    // Keep a single line as a plain string (back-compat); preserve all lines otherwise.
+    const recur = event.recurrence?.filter((l) => typeof l === "string" && l.trim() !== "") ?? [];
+    if (recur.length === 1) fm.recurrence = recur[0];
+    else if (recur.length > 1) fm.recurrence = recur;
 
-    const required = event.attendees?.filter((a) => !a.optional).map((a) => a.email) ?? [];
-    const optional = event.attendees?.filter((a) => a.optional).map((a) => a.email) ?? [];
-    if (required.length || optional.length) fm.attendees = { required, optional };
+    const att = event.attendees ?? [];
+    if (att.some(attendeeHasMetadata)) {
+        // Preserve the full attendee detail (response status, names, organizer, …).
+        fm.attendees = att.map((a) => {
+            const out: EventAttendee = { email: a.email };
+            if (a.optional != null) out.optional = a.optional;
+            for (const k of ATTENDEE_EXTRA_KEYS) {
+                if (a[k] != null) (out[k] as unknown) = a[k];
+            }
+            return out;
+        });
+    } else {
+        // No metadata → the compact required/optional email lists (back-compat).
+        const required = att.filter((a) => !a.optional).map((a) => a.email);
+        const optional = att.filter((a) => a.optional).map((a) => a.email);
+        if (required.length || optional.length) fm.attendees = { required, optional };
+    }
+
+    const meet = videoLink(event);
+    if (meet != null) fm.meetLink = meet;
+    if (Array.isArray(event.attachments) && event.attachments.length)
+        fm.attachments = event.attachments;
+    if (event.source != null) fm.source = event.source;
 
     return fm;
 }
@@ -118,6 +192,7 @@ export const EVENT_MANAGED_KEYS = [
     "description",
     "status",
     "visibility",
+    "transparency",
     "color",
     "guestsCanInviteOthers",
     "guestsCanModify",
@@ -126,6 +201,9 @@ export const EVENT_MANAGED_KEYS = [
     "eventType",
     "recurrence",
     "attendees",
+    "meetLink",
+    "attachments",
+    "source",
 ] as const;
 
 export const TASK_MANAGED_KEYS = [
@@ -136,6 +214,8 @@ export const TASK_MANAGED_KEYS = [
     "tasklist",
     "due",
     "notes",
+    "parent",
+    "position",
 ] as const;
 
 /**
@@ -156,8 +236,17 @@ export function mergeManagedFrontmatter(
     return { ...incoming, ...preserved };
 }
 
-/** Map a Google Tasks item into task note frontmatter. Pure. */
-export function remoteTaskToNote(task: GoogleTask, taskListId?: string): TaskFrontmatter {
+/**
+ * Map a Google Tasks item into task note frontmatter. Pure. `parentBasename` is the
+ * vault note name of the task's Google `parent`, resolved by the caller; when present
+ * it's written as a wikilink so the subtask relationship survives a round-trip and
+ * renders in the graph.
+ */
+export function remoteTaskToNote(
+    task: GoogleTask,
+    taskListId?: string,
+    parentBasename?: string,
+): TaskFrontmatter {
     const fm: TaskFrontmatter = {
         title: task.title || "Untitled task",
         completed: task.status === "completed",
@@ -167,5 +256,7 @@ export function remoteTaskToNote(task: GoogleTask, taskListId?: string): TaskFro
     if (taskListId) fm.tasklist = taskListId;
     if (task.due) fm.due = task.due;
     if (task.notes != null) fm.notes = task.notes;
+    if (task.parent && parentBasename) fm.parent = `[[${parentBasename}]]`;
+    if (task.position != null) fm.position = task.position;
     return fm;
 }

@@ -45,6 +45,59 @@ describe("task sync against mocked Google", function () {
         expect(body.status).to.equal("needsAction");
     });
 
+    it("nests a child task under its parent via the move/insert parent param", async () => {
+        await browser.executeObsidian(async ({ app, obsidian }) => {
+            if (!app.vault.getAbstractFileByPath("tasks")) await app.vault.createFolder("tasks");
+            for (const p of ["tasks/renew-rego.md", "tasks/pick-up-car.md"]) {
+                const old = app.vault.getAbstractFileByPath(p);
+                if (old instanceof obsidian.TFile) await app.vault.delete(old);
+            }
+            // Parent already has a googleId so the child's wikilink can resolve to it.
+            await app.vault.create(
+                "tasks/renew-rego.md",
+                "---\ntitle: Renew registration\ngoogleId: task-parent\ncompleted: false\n---\n",
+            );
+            await app.vault.create(
+                "tasks/pick-up-car.md",
+                '---\ntitle: Pick up the car\nparent: "[[renew-rego]]"\ncompleted: false\n---\n',
+            );
+        });
+
+        // Wait for the metadata cache to index the parent's googleId before syncing.
+        await browser.waitUntil(
+            async () =>
+                browser.executeObsidian(({ app }) => {
+                    const dest = app.metadataCache.getFirstLinkpathDest(
+                        "renew-rego",
+                        "tasks/pick-up-car.md",
+                    );
+                    const fm = dest && app.metadataCache.getFileCache(dest)?.frontmatter;
+                    return !!fm && fm.googleId === "task-parent";
+                }),
+            { timeout: 8000, interval: 250, timeoutMsg: "parent googleId not cached" },
+        );
+
+        await browser.executeObsidian(async ({ app }) => {
+            const plugin = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
+                .plugins.plugins["google-sync"] as { syncNow(): Promise<void> };
+            await plugin.syncNow();
+        });
+
+        await browser.waitUntil(
+            async () => {
+                const calls = await getMockCalls();
+                // The child is new, so it's inserted with ?parent=task-parent.
+                return calls.some(
+                    (c: MockCall) =>
+                        c.method === "POST" &&
+                        c.url.includes("/lists/L1/tasks") &&
+                        c.url.includes("parent=task-parent"),
+                );
+            },
+            { timeout: 8000, interval: 250, timeoutMsg: "no parented task insert recorded" },
+        );
+    });
+
     it("marks a completed task as completed in Google", async () => {
         await browser.executeObsidian(async ({ app, obsidian }) => {
             const plugin = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
