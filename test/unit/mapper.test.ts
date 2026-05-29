@@ -61,7 +61,7 @@ describe("taskToGoogle", () => {
         const t = taskToGoogle(fm, NZ);
         expect(t.title).to.equal("Buy groceries");
         expect(t.notes).to.equal("Almond milk.");
-        expect(t.due).to.equal("2026-05-30T06:00:00Z");
+        expect(t.due).to.equal("2026-05-30T00:00:00.000Z");
         expect(t.status).to.equal("needsAction");
     });
 

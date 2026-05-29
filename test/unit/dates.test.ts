@@ -31,9 +31,16 @@ describe("allDayEnd", () => {
 });
 
 describe("taskDue", () => {
-    it("converts a local due to UTC RFC3339", () => {
-        // 18:00 NZST (+12) -> 06:00Z same day
-        expect(taskDue("2026-05-30T18:00:00", NZ)).to.equal("2026-05-30T06:00:00Z");
+    it("emits the intended calendar date at UTC midnight (preserves the date)", () => {
+        // A timed due keeps its local calendar date — Google only honors the date part.
+        expect(taskDue("2026-05-30T18:00:00", NZ)).to.equal("2026-05-30T00:00:00.000Z");
+    });
+
+    it("does not roll a date-only due back a day for ahead-of-UTC zones", () => {
+        // Regression: midnight NZST (+13) is the previous day in UTC. The honored date must
+        // stay 2026-05-30, not become 2026-05-29 ("due tomorrow" must not show as "today").
+        expect(taskDue("2026-05-30", NZ)).to.equal("2026-05-30T00:00:00.000Z");
+        expect(taskDue("2026-05-30T00:00:00", NZ)).to.equal("2026-05-30T00:00:00.000Z");
     });
 });
 

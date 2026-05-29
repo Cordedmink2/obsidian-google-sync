@@ -35,11 +35,17 @@ export function allDayEnd(localIso: string, zone: string): GoogleEventDateTime {
     return { date };
 }
 
-/** Google Tasks `due` is RFC3339 but only the date is honored; emit UTC RFC3339. */
+/**
+ * Google Tasks `due` is RFC3339 but only the DATE part is honored (interpreted in UTC). Emit
+ * the user's intended calendar date at UTC midnight. Converting the local instant to UTC
+ * instead would roll the date back a day for ahead-of-UTC zones (e.g. a date-only "due
+ * tomorrow" in Pacific/Auckland becomes midnight local = the previous day in UTC, so Google
+ * shows it due "today").
+ */
 export function taskDue(localIso: string, zone: string): string {
-    const iso = parse(localIso, zone).toUTC().toISO({ suppressMilliseconds: true });
-    if (!iso) throw new DateParseError(`Invalid due "${localIso}"`);
-    return iso;
+    const date = parse(localIso, zone).toISODate();
+    if (!date) throw new DateParseError(`Invalid due "${localIso}"`);
+    return `${date}T00:00:00.000Z`;
 }
 
 /** True when the given local time is strictly before `now`. Invalid dates are not "past". */
