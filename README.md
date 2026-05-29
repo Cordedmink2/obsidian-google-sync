@@ -147,8 +147,24 @@ date: 2026-06-02T10:00
 end: 2026-06-02T11:00
 timezone: Pacific/Auckland
 location: Wellington
+description: Catch-up about Q3 plan
+status: confirmed
+visibility: default
+eventType: meeting
+color: "7"
+guestsCanInviteOthers: true
+guestsCanModify: false
+guestsCanSeeOtherGuests: true
+reminders:
+    useDefault: false
+    overrides:
+        - method: popup
+          minutes: 10
 attendees:
-    - alex@example.com
+    required:
+        - alex@example.com
+    optional:
+        -
 ---
 Notes for myself stay here, in Obsidian.
 ```

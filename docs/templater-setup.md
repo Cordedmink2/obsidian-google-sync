@@ -94,8 +94,24 @@ date: <% tp.date.now("YYYY-MM-DD[T]09:00") %>
 end: <% tp.date.now("YYYY-MM-DD[T]10:00") %>
 timezone: Pacific/Auckland
 location:
+description:
+status: confirmed
+visibility: default
+eventType: meeting
+color:
+guestsCanInviteOthers: true
+guestsCanModify: false
+guestsCanSeeOtherGuests: true
+reminders:
+    useDefault: false
+    overrides:
+        - method: popup
+          minutes: 10
 attendees:
-    -
+    required:
+        -
+    optional:
+        -
 ---
 Notes:
     -
