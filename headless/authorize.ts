@@ -63,7 +63,7 @@ function tryOpenBrowser(url: string): void {
 
 async function main(): Promise<number> {
     const args = parseArgs(process.argv.slice(2));
-    const config = await loadConfig(args.config);
+    const config = await loadConfig(args.config, { requireVault: false });
     const store = new FileTokenStore(config.tokenFile);
 
     if (args.fromPluginData) {

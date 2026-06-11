@@ -378,7 +378,8 @@ var DEFAULT_GIT = {
   authorName: "google-sync",
   authorEmail: "google-sync@localhost"
 };
-async function loadConfig(file) {
+async function loadConfig(file, options = {}) {
+  const requireVault = options.requireVault ?? true;
   const configDir = nodePath2.dirname(nodePath2.resolve(file));
   let raw;
   try {
@@ -386,7 +387,7 @@ async function loadConfig(file) {
   } catch (e) {
     throw new Error(`Could not read config ${file}: ${e.message}`);
   }
-  if (typeof raw.vaultPath !== "string" || !raw.vaultPath) {
+  if (requireVault && (typeof raw.vaultPath !== "string" || !raw.vaultPath)) {
     throw new Error(`Config ${file} must set "vaultPath"`);
   }
   const settings = {
@@ -395,12 +396,12 @@ async function loadConfig(file) {
   };
   if (process.env.GSYNC_CLIENT_SECRET) settings.clientSecret = process.env.GSYNC_CLIENT_SECRET;
   if (process.env.GSYNC_CLIENT_ID) settings.clientId = process.env.GSYNC_CLIENT_ID;
-  const vaultPath = nodePath2.resolve(configDir, raw.vaultPath);
+  const vaultPath = typeof raw.vaultPath === "string" && raw.vaultPath ? nodePath2.resolve(configDir, raw.vaultPath) : "";
   const tokenFile = nodePath2.resolve(
     configDir,
     typeof raw.tokenFile === "string" && raw.tokenFile ? raw.tokenFile : "gsync-tokens.json"
   );
-  if (tokenFile.startsWith(vaultPath + nodePath2.sep)) {
+  if (vaultPath && tokenFile.startsWith(vaultPath + nodePath2.sep)) {
     throw new Error(
       `tokenFile must live outside the vault (it would be committed and pushed): ${tokenFile}`
     );
@@ -451,7 +452,7 @@ function tryOpenBrowser(url) {
 }
 async function main() {
   const args = parseArgs(import_node_process.default.argv.slice(2));
-  const config = await loadConfig(args.config);
+  const config = await loadConfig(args.config, { requireVault: false });
   const store = new FileTokenStore(config.tokenFile);
   if (args.fromPluginData) {
     const data = await readPluginData(args.fromPluginData);

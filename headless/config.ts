@@ -39,7 +39,11 @@ const DEFAULT_GIT: HeadlessGitConfig = {
  * verbatim (see `authorize --from-plugin-data`). `GSYNC_CLIENT_SECRET` overrides the
  * client secret so it can stay out of the file.
  */
-export async function loadConfig(file: string): Promise<HeadlessConfig> {
+export async function loadConfig(
+    file: string,
+    options: { requireVault?: boolean } = {},
+): Promise<HeadlessConfig> {
+    const requireVault = options.requireVault ?? true;
     const configDir = nodePath.dirname(nodePath.resolve(file));
     let raw: Record<string, unknown>;
     try {
@@ -47,7 +51,7 @@ export async function loadConfig(file: string): Promise<HeadlessConfig> {
     } catch (e) {
         throw new Error(`Could not read config ${file}: ${(e as Error).message}`);
     }
-    if (typeof raw.vaultPath !== "string" || !raw.vaultPath) {
+    if (requireVault && (typeof raw.vaultPath !== "string" || !raw.vaultPath)) {
         throw new Error(`Config ${file} must set "vaultPath"`);
     }
 
@@ -58,12 +62,15 @@ export async function loadConfig(file: string): Promise<HeadlessConfig> {
     if (process.env.GSYNC_CLIENT_SECRET) settings.clientSecret = process.env.GSYNC_CLIENT_SECRET;
     if (process.env.GSYNC_CLIENT_ID) settings.clientId = process.env.GSYNC_CLIENT_ID;
 
-    const vaultPath = nodePath.resolve(configDir, raw.vaultPath);
+    const vaultPath =
+        typeof raw.vaultPath === "string" && raw.vaultPath
+            ? nodePath.resolve(configDir, raw.vaultPath)
+            : "";
     const tokenFile = nodePath.resolve(
         configDir,
         typeof raw.tokenFile === "string" && raw.tokenFile ? raw.tokenFile : "gsync-tokens.json",
     );
-    if (tokenFile.startsWith(vaultPath + nodePath.sep)) {
+    if (vaultPath && tokenFile.startsWith(vaultPath + nodePath.sep)) {
         throw new Error(
             `tokenFile must live outside the vault (it would be committed and pushed): ${tokenFile}`,
         );

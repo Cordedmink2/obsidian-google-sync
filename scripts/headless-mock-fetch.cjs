@@ -45,8 +45,16 @@ globalThis.fetch = async (url, init = {}) => {
             ],
         });
     }
-    if (method === "PATCH") return json({ id: "patched" });
+    if (method === "PATCH") return json({ id: "patched", ...JSON.parse(init.body || "{}") });
     if (method === "POST" && u.includes("oauth2"))
         return json({ access_token: "fresh", expires_in: 3600, refresh_token: "rt" });
+    if (method === "POST") {
+        // Echo the body back (like Google does) so CLI smoke tests can assert the mapping.
+        const echoed = init.body ? JSON.parse(init.body) : {};
+        const meet = u.includes("conferenceDataVersion=")
+            ? { hangoutLink: "https://meet.google.com/mock-link" }
+            : {};
+        return json({ id: "created-1", ...echoed, ...meet });
+    }
     return json({});
 };

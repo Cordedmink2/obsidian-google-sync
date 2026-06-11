@@ -1,4 +1,7 @@
 import process from "node:process";
+import * as os from "node:os";
+import * as nodePath from "node:path";
+import { existsSync } from "node:fs";
 import { DEFAULT_SCOPES, GoogleAuth } from "../src/google/auth";
 import { GoogleCalendarClient, WriteEventOptions } from "../src/google/calendar";
 import { GoogleTasksClient } from "../src/google/tasks";
@@ -96,7 +99,17 @@ function parseArgs(argv: string[]): Parsed {
         } else if (a.startsWith("--")) fail(`unknown flag: ${a}`);
         else positional.push(a);
     }
-    if (!flags.config) fail("required: --config <gsync.json>");
+    // --config > $GSYNC_CONFIG > ~/.config/gsync/gsync.json
+    if (!flags.config && process.env.GSYNC_CONFIG) flags.config = process.env.GSYNC_CONFIG;
+    if (!flags.config) {
+        const fallback = nodePath.join(os.homedir(), ".config", "gsync", "gsync.json");
+        if (existsSync(fallback)) flags.config = fallback;
+    }
+    if (!flags.config) {
+        fail(
+            "no config found — pass --config <gsync.json>, set GSYNC_CONFIG, or create ~/.config/gsync/gsync.json",
+        );
+    }
     const [group, command, id] = positional;
     if (!group || !command) fail(`missing command\n${USAGE}`);
     return { group, command, id, flags };
@@ -179,7 +192,7 @@ function taskBody(
 
 async function main(): Promise<void> {
     const { group, command, id, flags } = parseArgs(process.argv.slice(2));
-    const config = await loadConfig(flags.config);
+    const config = await loadConfig(flags.config, { requireVault: false });
     const auth = new GoogleAuth(
         nodeFetchHttp,
         () => ({

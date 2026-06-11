@@ -26,3 +26,6 @@ data.json
 
 # Playwright MCP artifacts
 .playwright-mcp/
+
+# Headless build output
+dist/

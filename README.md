@@ -269,6 +269,27 @@ Entries can be Obsidian wikilinks (so they also show up in the graph) or plain n
 - If imported notes get overwritten back to a template (e.g. `title: Event title`), see the Templater warning in the [Templater setup guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/templater-setup.md) — don't pair folder templates + trigger-on-creation with Import from Google. Re-running the import restores the real Google data into clobbered notes.
 - Test with a spare Google calendar/task list before using important real data.
 
+## Headless sync (server / cron)
+
+The same sync can run on a server without Obsidian — importing into the vault, pushing
+updates, filing lifecycle/orphan moves, and committing + pushing the vault's git repo on
+a schedule. Build with `npm run build:headless` and see the
+[headless guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/headless.md)
+for config, one-time authorization, and cron/systemd examples.
+
+## AI agent skill
+
+`skill/google-tasks-calendar/` is a SKILL.md-format skill that gives AI agents
+(Claude Code, Codex, OpenClaw, Hermes, …) create/read/update access to your Google
+Calendar and Tasks — every writable API field (attendees/invitations, recurrence,
+Meet links, reminders, colors, task details, subtasks), and **no delete capability**.
+Install it into every detected agent with:
+
+```bash
+npm run build:headless
+node scripts/install-skill.mjs        # or --target <skills-dir>, --list
+```
+
 More developer and test notes:
 
 - [Development guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/development.md)

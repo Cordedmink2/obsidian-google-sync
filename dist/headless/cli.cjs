@@ -24,6 +24,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 
 // headless/cli.ts
 var import_node_process = __toESM(require("node:process"));
+var os = __toESM(require("node:os"));
+var nodePath3 = __toESM(require("node:path"));
+var import_node_fs3 = require("node:fs");
 
 // src/google/http.ts
 function parseJson(text) {
@@ -7199,7 +7202,8 @@ var DEFAULT_GIT = {
   authorName: "google-sync",
   authorEmail: "google-sync@localhost"
 };
-async function loadConfig(file) {
+async function loadConfig(file, options = {}) {
+  const requireVault = options.requireVault ?? true;
   const configDir = nodePath2.dirname(nodePath2.resolve(file));
   let raw;
   try {
@@ -7207,7 +7211,7 @@ async function loadConfig(file) {
   } catch (e) {
     throw new Error(`Could not read config ${file}: ${e.message}`);
   }
-  if (typeof raw.vaultPath !== "string" || !raw.vaultPath) {
+  if (requireVault && (typeof raw.vaultPath !== "string" || !raw.vaultPath)) {
     throw new Error(`Config ${file} must set "vaultPath"`);
   }
   const settings = {
@@ -7216,12 +7220,12 @@ async function loadConfig(file) {
   };
   if (process.env.GSYNC_CLIENT_SECRET) settings.clientSecret = process.env.GSYNC_CLIENT_SECRET;
   if (process.env.GSYNC_CLIENT_ID) settings.clientId = process.env.GSYNC_CLIENT_ID;
-  const vaultPath = nodePath2.resolve(configDir, raw.vaultPath);
+  const vaultPath = typeof raw.vaultPath === "string" && raw.vaultPath ? nodePath2.resolve(configDir, raw.vaultPath) : "";
   const tokenFile = nodePath2.resolve(
     configDir,
     typeof raw.tokenFile === "string" && raw.tokenFile ? raw.tokenFile : "gsync-tokens.json"
   );
-  if (tokenFile.startsWith(vaultPath + nodePath2.sep)) {
+  if (vaultPath && tokenFile.startsWith(vaultPath + nodePath2.sep)) {
     throw new Error(
       `tokenFile must live outside the vault (it would be committed and pushed): ${tokenFile}`
     );
@@ -7287,7 +7291,16 @@ function parseArgs(argv) {
     } else if (a.startsWith("--")) fail(`unknown flag: ${a}`);
     else positional.push(a);
   }
-  if (!flags.config) fail("required: --config <gsync.json>");
+  if (!flags.config && import_node_process.default.env.GSYNC_CONFIG) flags.config = import_node_process.default.env.GSYNC_CONFIG;
+  if (!flags.config) {
+    const fallback = nodePath3.join(os.homedir(), ".config", "gsync", "gsync.json");
+    if ((0, import_node_fs3.existsSync)(fallback)) flags.config = fallback;
+  }
+  if (!flags.config) {
+    fail(
+      "no config found \u2014 pass --config <gsync.json>, set GSYNC_CONFIG, or create ~/.config/gsync/gsync.json"
+    );
+  }
   const [group, command, id] = positional;
   if (!group || !command) fail(`missing command
 ${USAGE}`);
@@ -7355,7 +7368,7 @@ function taskBody(input, config, requireComplete) {
 }
 async function main() {
   const { group, command, id, flags } = parseArgs(import_node_process.default.argv.slice(2));
-  const config = await loadConfig(flags.config);
+  const config = await loadConfig(flags.config, { requireVault: false });
   const auth = new GoogleAuth(
     nodeFetchHttp,
     () => ({
