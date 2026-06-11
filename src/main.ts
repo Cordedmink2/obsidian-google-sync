@@ -28,8 +28,10 @@ const LIFECYCLE_CHECK_MS = 60 * 60 * 1000; // hourly tick
 const LIFECYCLE_MIN_INTERVAL_MS = 23 * 60 * 60 * 1000; // ~daily
 
 /**
- * Google Calendar/Tasks sync. Obsidian -> Google, desktop + iOS. main.ts only wires
- * lifecycle + services; logic lives in src/google and src/sync.
+ * Google Calendar/Tasks sync, desktop + iOS. Google is the source of truth for existence:
+ * imports pull events/tasks into the vault, edits to linked notes patch back, and nothing
+ * here ever creates or deletes a Google object. main.ts only wires lifecycle + services;
+ * logic lives in src/google and src/sync.
  */
 export default class GoogleSyncPlugin extends Plugin {
     settings: GoogleSyncSettings = { ...DEFAULT_SETTINGS };
@@ -91,7 +93,6 @@ export default class GoogleSyncPlugin extends Plugin {
             window.setInterval(() => void this.maybeRunLifecycle(), LIFECYCLE_CHECK_MS),
         );
         this.app.workspace.onLayoutReady(() => {
-            this.router.buildIndex();
             // Run the startup import first, THEN the standalone lifecycle. Firing both
             // concurrently let the lifecycle scan before the import had written any notes —
             // it would archive nothing and still consume the ~daily interval, so nothing
@@ -377,7 +378,6 @@ export default class GoogleSyncPlugin extends Plugin {
                 this.lastLifecycleRun = Date.now();
                 await this.saveAll();
             }
-            this.router.buildIndex();
             result = { events, tasks, failed, lifecycleCounts };
         })();
         try {
@@ -420,7 +420,6 @@ export default class GoogleSyncPlugin extends Plugin {
             expiresAt: Date.now() + 3600_000,
         };
         await this.saveAll();
-        this.router.buildIndex();
     }
 
     // ---- internals ----
@@ -433,7 +432,6 @@ export default class GoogleSyncPlugin extends Plugin {
         if (!params.code || !params.state) return;
         try {
             await this.auth.completeAuth(params.code, params.state);
-            this.router.buildIndex();
             new Notice("Connected to Google.");
         } catch (e) {
             new Notice(`Google auth failed: ${(e as Error).message}`);
@@ -444,9 +442,12 @@ export default class GoogleSyncPlugin extends Plugin {
     }
 
     private registerVaultEvents(): void {
+        // Creation and deletion never touch Google: a created note with a googleId (e.g.
+        // arriving via git/Obsidian Sync) is patched like an edit, one without is a no-op
+        // in the router, and deleting a note leaves the Google item alone.
         this.registerEvent(
             this.app.vault.on("create", (f) => {
-                if (f instanceof TFile && this.settings.syncOnCreate && !this.isSuppressed(f.path))
+                if (f instanceof TFile && this.settings.syncOnModify && !this.isSuppressed(f.path))
                     this.debounceSync(f);
             }),
         );
@@ -457,13 +458,8 @@ export default class GoogleSyncPlugin extends Plugin {
             }),
         );
         this.registerEvent(
-            this.app.vault.on("delete", (f) => {
-                if (f instanceof TFile && this.settings.syncOnDelete) void this.safeDelete(f.path);
-            }),
-        );
-        this.registerEvent(
-            this.app.vault.on("rename", (f, oldPath) => {
-                if (f instanceof TFile) void this.safeRename(f, oldPath);
+            this.app.vault.on("rename", (f) => {
+                if (f instanceof TFile) void this.safeRename(f);
             }),
         );
     }
@@ -509,19 +505,10 @@ export default class GoogleSyncPlugin extends Plugin {
         await this.runLifecycle(false);
     }
 
-    private async safeDelete(path: string): Promise<void> {
+    private async safeRename(file: TFile): Promise<void> {
         if (!(await this.auth.isConnected())) return;
         try {
-            await this.router.handleDelete(path);
-        } catch (e) {
-            new Notice(`google-sync: ${(e as Error).message}`);
-        }
-    }
-
-    private async safeRename(file: TFile, oldPath: string): Promise<void> {
-        if (!(await this.auth.isConnected())) return;
-        try {
-            await this.router.handleRename(file, oldPath);
+            await this.router.syncFile(file);
         } catch (e) {
             new Notice(`google-sync: ${(e as Error).message}`);
         }

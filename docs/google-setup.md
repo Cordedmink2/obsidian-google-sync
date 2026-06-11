@@ -154,7 +154,7 @@ To get clean event/task notes with one click, pair this with the **Templater** c
 - Setup guide: [Templater setup](templater-setup.md)
 
 > [!WARNING]
-> If you use **Import from Google** (or import-on-startup), do **not** combine Templater folder templates on `events`/`tasks` with "trigger on new file creation" — it overwrites imported notes. The [Templater setup](templater-setup.md) guide explains the safe options. Version 0.2.1+ also imports notes as `syncDirection: pull-only` so local template clobbers do not PATCH Google.
+> If you use **Import from Google** (or import-on-startup), do **not** combine Templater folder templates on `events`/`tasks` with "trigger on new file creation" — it overwrites imported notes. The [Templater setup](templater-setup.md) guide explains the safe options.
 
 ---
 

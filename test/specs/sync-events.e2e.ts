@@ -14,7 +14,7 @@ describe("event sync against mocked Google", function () {
         await resetMockCalls();
     });
 
-    it("inserts a new event and writes googleId back into the note", async () => {
+    it("does not create a Google event for a note without googleId (one-way)", async () => {
         const googleId = await browser.executeObsidian(async ({ app, obsidian }) => {
             const plugin = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
                 .plugins.plugins["google-sync"] as { syncNow(): Promise<void> };
@@ -34,19 +34,16 @@ describe("event sync against mocked Google", function () {
             return m ? m[1] : null;
         });
 
-        expect(googleId ?? "").to.match(/^mock-/);
+        expect(googleId).to.equal(null);
 
         const calls = await getMockCalls();
         const insert = calls.find(
-            (c: MockCall) => c.method === "POST" && c.url.endsWith("/events"),
+            (c: MockCall) => c.method === "POST" && c.url.includes("/events"),
         );
-        if (!insert) throw new Error("no calendar insert recorded");
-        const body = JSON.parse(insert.body ?? "{}") as { summary?: string; start?: unknown };
-        expect(body.summary).to.equal("Standup");
-        expect(body.start).to.not.equal(undefined);
+        expect(insert, "sync must never POST a new event").to.equal(undefined);
     });
 
-    it("requests a Meet link for conferencing:true and writes meetLink back", async () => {
+    it("requests a Meet link for conferencing:true on patch and writes meetLink back", async () => {
         const meetLink = await browser.executeObsidian(async ({ app, obsidian }) => {
             const plugin = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
                 .plugins.plugins["google-sync"] as { syncNow(): Promise<void> };
@@ -56,7 +53,7 @@ describe("event sync against mocked Google", function () {
             if (old instanceof obsidian.TFile) await app.vault.delete(old);
             await app.vault.create(
                 path,
-                "---\ntitle: Call\ndate: 2026-06-04T09:00:00\ntimezone: Pacific/Auckland\nconferencing: true\n---\n",
+                "---\ntitle: Call\ndate: 2026-06-04T09:00:00\ntimezone: Pacific/Auckland\nconferencing: true\ngoogleId: ev-conf\n---\n",
             );
             await plugin.syncNow();
             const file = app.vault.getAbstractFileByPath(path);
@@ -67,14 +64,14 @@ describe("event sync against mocked Google", function () {
         });
 
         const calls = await getMockCalls();
-        const insert = calls.find(
+        const patch = calls.find(
             (c: MockCall) =>
-                c.method === "POST" &&
-                c.url.includes("/events?") &&
+                c.method === "PATCH" &&
+                c.url.includes("/events/ev-conf") &&
                 c.url.includes("conferenceDataVersion=1"),
         );
-        if (!insert) throw new Error("no conferencing insert recorded");
-        const body = JSON.parse(insert.body ?? "{}") as {
+        if (!patch) throw new Error("no conferencing patch recorded");
+        const body = JSON.parse(patch.body ?? "{}") as {
             conferenceData?: { createRequest?: unknown };
         };
         expect(body.conferenceData?.createRequest).to.not.equal(undefined);
@@ -104,7 +101,7 @@ describe("event sync against mocked Google", function () {
         expect(body.summary).to.equal("Existing");
     });
 
-    it("deletes the Google event when the note is deleted", async () => {
+    it("leaves the Google event alone when the note is deleted (one-way)", async () => {
         await browser.executeObsidian(async ({ app, obsidian }) => {
             const plugin = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
                 .plugins.plugins["google-sync"] as { syncNow(): Promise<void> };
@@ -115,19 +112,15 @@ describe("event sync against mocked Google", function () {
                 path,
                 "---\ntitle: Delete me\ndate: 2026-06-04T10:00:00\ntimezone: Pacific/Auckland\ngoogleId: ev-del\n---\n",
             );
-            await plugin.syncNow(); // populates the path -> id index
+            await plugin.syncNow();
             const file = app.vault.getAbstractFileByPath(path);
             if (file instanceof obsidian.TFile) await app.vault.delete(file);
         });
 
-        await browser.waitUntil(
-            async () => {
-                const calls = await getMockCalls();
-                return calls.some(
-                    (c: MockCall) => c.method === "DELETE" && c.url.includes("/events/ev-del"),
-                );
-            },
-            { timeout: 8000, interval: 250, timeoutMsg: "no calendar delete recorded" },
-        );
+        // Give a would-be delete handler ample time to fire, then assert it never did.
+        await browser.pause(2500);
+        const calls = await getMockCalls();
+        const del = calls.find((c: MockCall) => c.method === "DELETE");
+        expect(del, "note deletion must never delete the Google event").to.equal(undefined);
     });
 });

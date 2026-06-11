@@ -171,9 +171,9 @@ describe("eventToGoogle", () => {
 });
 
 describe("remoteEventToNote", () => {
-    it("marks imported events as pull-only to avoid echo PATCHes", () => {
+    it("does not stamp a syncDirection — imported events are updatable by default", () => {
         const fm = remoteEventToNote({ id: "e1", summary: "Imported" }, "primary");
-        expect(fm.syncDirection).to.equal("pull-only");
+        expect(fm.syncDirection).to.equal(undefined);
     });
     it("maps extended event fields back into frontmatter", () => {
         const fm = remoteEventToNote(
@@ -324,9 +324,9 @@ describe("taskToGoogle", () => {
 });
 
 describe("remoteTaskToNote", () => {
-    it("marks imported tasks as pull-only to avoid echo PATCHes", () => {
+    it("does not stamp a syncDirection — imported tasks are updatable by default", () => {
         const fm = remoteTaskToNote({ id: "t1", title: "Imported task" }, "L1");
-        expect(fm.syncDirection).to.equal("pull-only");
+        expect(fm.syncDirection).to.equal(undefined);
     });
     it("maps notes + due and leaves parent unset for a top-level task", () => {
         const fm = remoteTaskToNote(

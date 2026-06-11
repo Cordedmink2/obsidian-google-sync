@@ -13,7 +13,7 @@ describe("task sync against mocked Google", function () {
         await resetMockCalls();
     });
 
-    it("inserts a new task and writes googleId back", async () => {
+    it("does not create a Google task for a note without googleId (one-way)", async () => {
         const googleId = await browser.executeObsidian(async ({ app, obsidian }) => {
             const plugin = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
                 .plugins.plugins["google-sync"] as { syncNow(): Promise<void> };
@@ -33,33 +33,30 @@ describe("task sync against mocked Google", function () {
             return m ? m[1] : null;
         });
 
-        expect(googleId ?? "").to.match(/^mock-/);
+        expect(googleId).to.equal(null);
 
         const calls = await getMockCalls();
         const insert = calls.find(
             (c: MockCall) => c.method === "POST" && c.url.includes("/lists/L1/tasks"),
         );
-        if (!insert) throw new Error("no task insert recorded");
-        const body = JSON.parse(insert.body ?? "{}") as { title?: string; status?: string };
-        expect(body.title).to.equal("Buy milk");
-        expect(body.status).to.equal("needsAction");
+        expect(insert, "sync must never POST a new task").to.equal(undefined);
     });
 
-    it("nests a child task under its parent via the move/insert parent param", async () => {
+    it("nests a linked child task under its parent via the move endpoint", async () => {
         await browser.executeObsidian(async ({ app, obsidian }) => {
             if (!app.vault.getAbstractFileByPath("tasks")) await app.vault.createFolder("tasks");
             for (const p of ["tasks/renew-rego.md", "tasks/pick-up-car.md"]) {
                 const old = app.vault.getAbstractFileByPath(p);
                 if (old instanceof obsidian.TFile) await app.vault.delete(old);
             }
-            // Parent already has a googleId so the child's wikilink can resolve to it.
+            // Both notes are linked (have googleIds); the child's wikilink resolves the parent.
             await app.vault.create(
                 "tasks/renew-rego.md",
                 "---\ntitle: Renew registration\ngoogleId: task-parent\ncompleted: false\n---\n",
             );
             await app.vault.create(
                 "tasks/pick-up-car.md",
-                '---\ntitle: Pick up the car\nparent: "[[renew-rego]]"\ncompleted: false\n---\n',
+                '---\ntitle: Pick up the car\nparent: "[[renew-rego]]"\ngoogleId: task-child\ncompleted: false\n---\n',
             );
         });
 
@@ -86,15 +83,15 @@ describe("task sync against mocked Google", function () {
         await browser.waitUntil(
             async () => {
                 const calls = await getMockCalls();
-                // The child is new, so it's inserted with ?parent=task-parent.
+                // The child is patched, then re-nested via /move?parent=task-parent.
                 return calls.some(
                     (c: MockCall) =>
                         c.method === "POST" &&
-                        c.url.includes("/lists/L1/tasks") &&
+                        c.url.includes("/tasks/task-child/move") &&
                         c.url.includes("parent=task-parent"),
                 );
             },
-            { timeout: 8000, interval: 250, timeoutMsg: "no parented task insert recorded" },
+            { timeout: 8000, interval: 250, timeoutMsg: "no task move recorded" },
         );
     });
 

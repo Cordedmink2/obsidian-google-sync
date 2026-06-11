@@ -8,25 +8,17 @@ import { linkToBasename } from "./lifecycle-plan";
 import { readFrontmatter, writeFrontmatterKey } from "../io";
 import { EventFrontmatter, GoogleEvent, NoteKind } from "../types";
 
-interface RemoteRef {
-    kind: NoteKind;
-    googleId: string;
-    container: string; // calendarId for events, taskListId for tasks
-    pullOnly: boolean;
-}
-
 function isPullOnly(fm: Record<string, unknown>): boolean {
     return fm.syncDirection === "pull-only" || fm.googleSyncDirection === "pull-only";
 }
 
 /**
- * Turns vault changes into Google Calendar/Tasks operations. Holds a path -> remote-id
- * index (rebuilt from frontmatter on load) so deletes can target the right Google object
- * after the note is gone.
+ * Pushes vault note edits to Google as updates (PATCH) — and nothing else. Sync is
+ * one-way for existence: notes never create Google objects (only an import links a note
+ * to an existing item via `googleId`) and never delete them. A note without a `googleId`
+ * is simply local-only.
  */
 export class SyncRouter {
-    private index = new Map<string, RemoteRef>();
-
     constructor(
         private readonly app: App,
         private readonly calendar: GoogleCalendarClient,
@@ -35,8 +27,8 @@ export class SyncRouter {
         private readonly notify: (msg: string) => void = (m) => {
             new Notice(m);
         },
-        /** Called when the router writes a googleId back into a note, so the caller can
-         * suppress the resulting modify event from echoing back into sync. */
+        /** Called when the router writes a key back into a note (e.g. meetLink), so the
+         * caller can suppress the resulting modify event from echoing back into sync. */
         private readonly onTouch: (path: string) => void = () => {},
     ) {}
 
@@ -45,29 +37,6 @@ export class SyncRouter {
         const s = this.settings();
         if (isManagedSubpath(path, s.eventsFolder, s.tasksFolder)) return null;
         return detectKind(path, s.eventsFolder, s.tasksFolder);
-    }
-
-    /** Rebuild the path -> remote-id index from frontmatter (fast: uses metadataCache). */
-    buildIndex(): void {
-        this.index.clear();
-        const s = this.settings();
-        for (const file of scopedMarkdownFiles(this.app, [s.eventsFolder, s.tasksFolder])) {
-            const kind = this.syncKind(file.path);
-            if (!kind) continue;
-            const fm = this.app.metadataCache.getFileCache(file)?.frontmatter;
-            const googleId: unknown = fm?.googleId;
-            if (typeof googleId !== "string" || !googleId) continue;
-            const container =
-                kind === "event"
-                    ? (fm?.calendarId as string) || s.defaultCalendarId
-                    : (fm?.tasklist as string) || s.taskListId;
-            this.index.set(file.path, {
-                kind,
-                googleId,
-                container,
-                pullOnly: isPullOnly(fm as Record<string, unknown>),
-            });
-        }
     }
 
     async syncFile(file: TFile): Promise<void> {
@@ -85,42 +54,18 @@ export class SyncRouter {
             this.notify(`google-sync: ${file.name}: ${v.errors.join("; ")}`);
             return;
         }
+        // One-way: notes without a googleId stay local until an import links them.
+        if (!v.value.googleId) return;
         const s = this.settings();
         const calendarId = v.value.calendarId || s.defaultCalendarId;
         const body = eventToGoogle(v.value, s.defaultTimezone);
         const opts = this.eventWriteOptions(v.value, body);
-        if (v.value.googleId) {
-            const patched = await this.calendar.patchEvent(
-                calendarId,
-                v.value.googleId,
-                body,
-                opts,
-            );
-            await this.writeMeetLinkBack(file, v.value, patched);
-            this.index.set(file.path, {
-                kind: "event",
-                googleId: v.value.googleId,
-                container: calendarId,
-                pullOnly: false,
-            });
-        } else {
-            const created = await this.calendar.insertEvent(calendarId, body, opts);
-            if (created.id) {
-                await writeFrontmatterKey(this.app, file, "googleId", created.id);
-                this.onTouch(file.path);
-                await this.writeMeetLinkBack(file, v.value, created);
-                this.index.set(file.path, {
-                    kind: "event",
-                    googleId: created.id,
-                    container: calendarId,
-                    pullOnly: false,
-                });
-            }
-        }
+        const patched = await this.calendar.patchEvent(calendarId, v.value.googleId, body, opts);
+        await this.writeMeetLinkBack(file, v.value, patched);
     }
 
     /**
-     * Derive insert/patch query params from the event, and — when the note asks for a
+     * Derive patch query params from the event, and — when the note asks for a
      * Google Meet link it doesn't have yet — attach a conferenceData create request.
      */
     private eventWriteOptions(value: EventFrontmatter, body: GoogleEvent): WriteEventOptions {
@@ -164,6 +109,8 @@ export class SyncRouter {
             this.notify(`google-sync: ${file.name}: ${v.errors.join("; ")}`);
             return;
         }
+        // One-way: notes without a googleId stay local until an import links them.
+        if (!v.value.googleId) return;
         const s = this.settings();
         const taskListId = v.value.tasklist || s.taskListId;
         if (!taskListId) {
@@ -172,40 +119,15 @@ export class SyncRouter {
         }
         const body = taskToGoogle(v.value, s.defaultTimezone);
         const parentId = this.resolveParentGoogleId(v.value.parent, file.path);
-        if (v.value.googleId) {
-            await this.tasks.patchTask(taskListId, v.value.googleId, body);
-            // parent can't be changed via patch — move handles (re)nesting.
-            if (parentId)
-                await this.tasks.moveTask(taskListId, v.value.googleId, { parent: parentId });
-            this.index.set(file.path, {
-                kind: "task",
-                googleId: v.value.googleId,
-                container: taskListId,
-                pullOnly: false,
-            });
-        } else {
-            const created = await this.tasks.insertTask(
-                taskListId,
-                body,
-                parentId ? { parent: parentId } : {},
-            );
-            if (created.id) {
-                await writeFrontmatterKey(this.app, file, "googleId", created.id);
-                this.onTouch(file.path);
-                this.index.set(file.path, {
-                    kind: "task",
-                    googleId: created.id,
-                    container: taskListId,
-                    pullOnly: false,
-                });
-            }
-        }
+        await this.tasks.patchTask(taskListId, v.value.googleId, body);
+        // parent can't be changed via patch — move handles (re)nesting.
+        if (parentId) await this.tasks.moveTask(taskListId, v.value.googleId, { parent: parentId });
     }
 
     /**
      * Resolve a task note's `parent` wikilink/basename to the parent task's Google id,
      * so it can be nested as a subtask. Returns undefined when there's no parent, the
-     * link doesn't resolve, or the parent hasn't been pushed to Google yet (no googleId).
+     * link doesn't resolve, or the parent isn't linked to Google yet (no googleId).
      */
     private resolveParentGoogleId(parent: unknown, fromPath: string): string | undefined {
         if (typeof parent !== "string" || parent.trim() === "") return undefined;
@@ -213,25 +135,6 @@ export class SyncRouter {
         if (!dest) return undefined;
         const gid: unknown = this.app.metadataCache.getFileCache(dest)?.frontmatter?.googleId;
         return typeof gid === "string" && gid ? gid : undefined;
-    }
-
-    /** Delete the Google object for a (now-removed) note path, if we know its id. */
-    async handleDelete(path: string): Promise<void> {
-        const ref = this.index.get(path);
-        if (!ref || ref.pullOnly) return;
-        if (ref.kind === "event") await this.calendar.deleteEvent(ref.container, ref.googleId);
-        else await this.tasks.deleteTask(ref.container, ref.googleId);
-        this.index.delete(path);
-    }
-
-    /** Track a rename so a later delete still resolves, then re-sync the new path. */
-    async handleRename(file: TFile, oldPath: string): Promise<void> {
-        const ref = this.index.get(oldPath);
-        if (ref) {
-            this.index.delete(oldPath);
-            this.index.set(file.path, ref);
-        }
-        await this.syncFile(file);
     }
 
     /**

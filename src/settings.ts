@@ -17,9 +17,7 @@ export interface GoogleSyncSettings {
     taskListId: string;
     defaultTimezone: string;
     // Behavior
-    syncOnCreate: boolean;
     syncOnModify: boolean;
-    syncOnDelete: boolean;
     importOnStartup: boolean;
     importOnlyDefaultCalendar: boolean;
     importOnlyDefaultTaskList: boolean;
@@ -49,9 +47,7 @@ export const DEFAULT_SETTINGS: GoogleSyncSettings = {
     defaultCalendarId: "primary",
     taskListId: "@default",
     defaultTimezone: systemTimezone(),
-    syncOnCreate: true,
     syncOnModify: true,
-    syncOnDelete: true,
     importOnStartup: false,
     importOnlyDefaultCalendar: true,
     importOnlyDefaultTaskList: true,
@@ -280,12 +276,10 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
 
         // --- Behavior ---
         new Setting(containerEl).setName("Behavior").setHeading();
-        this.toggle("Sync on create", "Push new notes to Google.", "syncOnCreate");
-        this.toggle("Sync on modify", "Push edits to Google.", "syncOnModify");
         this.toggle(
-            "Sync on delete",
-            "Delete the Google item when a note is deleted.",
-            "syncOnDelete",
+            "Push local edits to Google",
+            "Update the Google item when a note that already has a googleId is edited. New notes and deletions never touch Google.",
+            "syncOnModify",
         );
         this.toggle(
             "Import from Google on startup",

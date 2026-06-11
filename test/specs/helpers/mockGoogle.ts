@@ -120,7 +120,7 @@ function install(): void {
             });
         if (req.url.includes("oauth2.googleapis.com/token"))
             return ok({ access_token: "e2e", expires_in: 3600, refresh_token: "rt" });
-        if (method === "POST" && req.url.includes("conferenceDataVersion="))
+        if (req.url.includes("conferenceDataVersion=") && (method === "POST" || method === "PATCH"))
             return ok({ id: `mock-${++seq}`, hangoutLink: "https://meet.google.com/e2e-link" });
         if (method === "POST") return ok({ id: `mock-${++seq}` });
         if (method === "PATCH") return ok({ id: "patched" });

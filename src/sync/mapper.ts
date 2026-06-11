@@ -116,7 +116,6 @@ export function remoteEventToNote(event: GoogleEvent, calendarId: string): Event
     const fm: EventFrontmatter = {
         title: event.summary || "Untitled event",
         calendarId,
-        syncDirection: "pull-only",
     };
 
     if (event.id) fm.googleId = event.id;
@@ -251,7 +250,6 @@ export function remoteTaskToNote(
         title: task.title || "Untitled task",
         completed: task.status === "completed",
         status: task.status || "needsAction",
-        syncDirection: "pull-only",
     };
     if (task.id) fm.googleId = task.id;
     if (taskListId) fm.tasklist = taskListId;

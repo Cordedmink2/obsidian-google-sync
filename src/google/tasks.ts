@@ -116,11 +116,4 @@ export class GoogleTasksClient {
             body: patch,
         })) as GoogleTask;
     }
-
-    async deleteTask(taskListId: string, taskId: string): Promise<void> {
-        await this.call({
-            method: "DELETE",
-            url: `${BASE}/lists/${enc(taskListId)}/tasks/${enc(taskId)}`,
-        });
-    }
 }

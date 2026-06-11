@@ -71,11 +71,9 @@ describe("GoogleCalendarClient", () => {
         );
     });
 
-    it("deletes an event (handles empty 204)", async () => {
-        const { calls, fn } = fakeHttp([emptyResp(204)]);
-        const client = new GoogleCalendarClient(fn, token, noWaitRetry);
-        await client.deleteEvent("primary", "ev1");
-        expect(calls[0]?.method).to.equal("DELETE");
+    it("has no delete capability (one-way: nothing here may delete Google events)", () => {
+        const client = new GoogleCalendarClient(fakeHttp().fn, token, noWaitRetry);
+        expect((client as unknown as Record<string, unknown>).deleteEvent).to.equal(undefined);
     });
 
     it("throws GoogleApiError on 404", async () => {

@@ -89,13 +89,6 @@ export class GoogleCalendarClient {
         })) as GoogleEvent;
     }
 
-    async deleteEvent(calendarId: string, eventId: string): Promise<void> {
-        await this.call({
-            method: "DELETE",
-            url: `${BASE}/calendars/${enc(calendarId)}/events/${enc(eventId)}`,
-        });
-    }
-
     async listCalendars(): Promise<CalendarListEntry[]> {
         const r = (await this.call({ method: "GET", url: `${BASE}/users/me/calendarList` })) as {
             items?: CalendarListEntry[];

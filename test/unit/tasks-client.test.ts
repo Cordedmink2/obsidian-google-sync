@@ -61,11 +61,9 @@ describe("GoogleTasksClient", () => {
         expect(calls[0]?.url).to.contain("/lists/L1/tasks/t1");
     });
 
-    it("deletes a task", async () => {
-        const { calls, fn } = fakeHttp([emptyResp(204)]);
-        const client = new GoogleTasksClient(fn, token, noWaitRetry);
-        await client.deleteTask("L1", "t1");
-        expect(calls[0]?.method).to.equal("DELETE");
+    it("has no delete capability (one-way: nothing here may delete Google tasks)", () => {
+        const client = new GoogleTasksClient(fakeHttp().fn, token, noWaitRetry);
+        expect((client as unknown as Record<string, unknown>).deleteTask).to.equal(undefined);
     });
 
     it("throws GoogleApiError on 500", async () => {

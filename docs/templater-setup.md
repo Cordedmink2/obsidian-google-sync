@@ -7,7 +7,7 @@ If you use the **Templater** community plugin, you can standardize new event/tas
 >
 > When Google Sync imports an event/task it creates a note in those folders. With trigger-on-creation enabled, Templater immediately rewrites that note from the template — overwriting the real `title`/`date`/body with the template's defaults. You end up with notes that say `title: Event title`, dated whatever the template hardcodes, even though the file was a real imported event.
 >
-> Google Sync (0.2.1+) marks imported notes `syncDirection: pull-only`, so a clobbered imported note should not be patched back to Google. But Templater can still mangle the **local** note. If you import from Google, choose one:
+> Google Sync writes imported notes inside an echo-suppression window so the rewrite doesn't immediately push, but Templater can still mangle the **local** note. If you import from Google, choose one:
 >
 > - **Turn off** "Trigger Templater on new file creation", or
 > - **Remove** the `events`/`tasks` folder-template mappings (apply templates manually to notes you author), or
