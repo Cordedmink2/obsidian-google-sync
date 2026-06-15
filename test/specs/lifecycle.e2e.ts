@@ -13,7 +13,7 @@ describe("lifecycle scan against mocked Google", function () {
     });
 
     it("archives a past event and moves an overdue task", async () => {
-        const result = await browser.executeObsidian(async ({ app, obsidian }) => {
+        await browser.executeObsidian(async ({ app, obsidian }) => {
             for (const folder of ["events", "tasks"]) {
                 if (!app.vault.getAbstractFileByPath(folder)) await app.vault.createFolder(folder);
             }
@@ -36,26 +36,49 @@ describe("lifecycle scan against mocked Google", function () {
                 "tasks/late-task.md",
                 "---\ntitle: Late task\ndue: 2026-01-01T09:00:00\ncompleted: false\n---\n",
             );
-
             const plugin = (app as unknown as { plugins: { plugins: Record<string, unknown> } })
                 .plugins.plugins["google-sync"] as PluginApi;
             await plugin.runLifecycle(true);
-
-            return {
-                archived:
-                    app.vault.getAbstractFileByPath("events/archive/past-event.md") instanceof
-                    obsidian.TFile,
-                overdue:
-                    app.vault.getAbstractFileByPath("tasks/overdue/late-task.md") instanceof
-                    obsidian.TFile,
-                originalEventGone: !app.vault.getAbstractFileByPath("events/past-event.md"),
-                originalTaskGone: !app.vault.getAbstractFileByPath("tasks/late-task.md"),
-            };
         });
 
+        await browser.waitUntil(
+            async () => {
+                const result = await lifecycleVaultState();
+                return result.archived && result.overdue;
+            },
+            { timeout: 5000, interval: 250, timeoutMsg: "lifecycle did not move event/task" },
+        );
+
+        const result = await lifecycleVaultState();
         expect(result.archived, "event moved to archive/").to.equal(true);
-        expect(result.overdue, "task moved to overdue/").to.equal(true);
+        expect(result.overdue, `task moved to overdue/: ${result.paths.join(",")}`).to.equal(true);
         expect(result.originalEventGone).to.equal(true);
         expect(result.originalTaskGone).to.equal(true);
     });
 });
+
+async function lifecycleVaultState(): Promise<{
+    archived: boolean;
+    overdue: boolean;
+    originalEventGone: boolean;
+    originalTaskGone: boolean;
+    paths: string[];
+}> {
+    return browser.executeObsidian(({ app, obsidian }) => {
+        const files = app.vault
+            .getFiles()
+            .map((f) => f.path)
+            .filter((p) => p.includes("past-event") || p.includes("late-task"));
+        return {
+            archived:
+                app.vault.getAbstractFileByPath("events/archive/past-event.md") instanceof
+                obsidian.TFile,
+            overdue:
+                app.vault.getAbstractFileByPath("tasks/overdue/late-task.md") instanceof
+                obsidian.TFile,
+            originalEventGone: !app.vault.getAbstractFileByPath("events/past-event.md"),
+            originalTaskGone: !app.vault.getAbstractFileByPath("tasks/late-task.md"),
+            paths: files,
+        };
+    });
+}
