@@ -71,7 +71,7 @@ export async function withRetry(
                 if (typeof window !== "undefined" && typeof window.setTimeout === "function") {
                     window.setTimeout(resolve, ms);
                 } else {
-                    globalThis.setTimeout(resolve, ms);
+                    setTimeout(resolve, ms);
                 }
             }));
     const random = opts.random ?? Math.random;

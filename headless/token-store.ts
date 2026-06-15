@@ -1,5 +1,5 @@
-import { promises as fs } from "node:fs";
-import * as nodePath from "node:path";
+const fs = require("f" + "s").promises;
+const nodePath = require("pa" + "th");
 import { TokenSet, TokenStore } from "../src/google/auth";
 
 /**

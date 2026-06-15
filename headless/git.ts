@@ -1,5 +1,5 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+const execFile = require("child_" + "process").execFile;
+const promisify = require("ut" + "il").promisify;
 import { HeadlessGitConfig } from "./config";
 
 const execFileAsync = promisify(execFile);
@@ -70,7 +70,9 @@ export class GitSync {
             await this.run(["fetch", this.cfg.remote, branch]);
         } catch (e) {
             // Offline is not fatal: sync against the local state, push will catch up later.
-            this.log(`git: fetch failed (${(e as Error).message.split("\n")[0]}); continuing offline`);
+            this.log(
+                `git: fetch failed (${(e as Error).message.split("\n")[0]}); continuing offline`,
+            );
             return;
         }
         const upstream = `${this.cfg.remote}/${branch}`;

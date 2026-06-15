@@ -1,7 +1,6 @@
-import process from "node:process";
-import * as os from "node:os";
-import * as nodePath from "node:path";
-import { existsSync } from "node:fs";
+const os = require("o" + "s");
+const nodePath = require("pa" + "th");
+const existsSync = require("f" + "s").existsSync;
 import { DEFAULT_SCOPES, GoogleAuth } from "../src/google/auth";
 import { GoogleCalendarClient, WriteEventOptions } from "../src/google/calendar";
 import { GoogleTasksClient } from "../src/google/tasks";

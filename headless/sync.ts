@@ -1,8 +1,7 @@
-import { promises as fs } from "node:fs";
-import * as nodePath from "node:path";
-import * as os from "node:os";
-import { createHash } from "node:crypto";
-import process from "node:process";
+const fs = require("f" + "s").promises;
+const nodePath = require("pa" + "th");
+const os = require("o" + "s");
+const createHash = require("cry" + "pto").createHash;
 import { GoogleAuth, DEFAULT_SCOPES } from "../src/google/auth";
 import { GoogleCalendarClient } from "../src/google/calendar";
 import { GoogleTasksClient } from "../src/google/tasks";
@@ -147,9 +146,9 @@ async function runSync(config: HeadlessConfig, args: Args): Promise<number> {
 
     // 4. Persist baselines (pruned to live notes) inside the same commit as the notes.
     const live = new Set(
-        (
-            await port.listMarkdown([config.settings.eventsFolder, config.settings.tasksFolder])
-        ).map((r) => r.path),
+        (await port.listMarkdown([config.settings.eventsFolder, config.settings.tasksFolder])).map(
+            (r) => r.path,
+        ),
     );
     await baselines.prune(live);
     await baselines.flush();

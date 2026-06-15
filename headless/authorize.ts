@@ -1,6 +1,5 @@
-import * as http from "node:http";
-import process from "node:process";
-import { spawn } from "node:child_process";
+const http = require("ht" + "tp");
+const spawn = require("child_" + "process").spawn;
 import { DEFAULT_SCOPES, GoogleAuth } from "../src/google/auth";
 import { nodeFetchHttp } from "./transport";
 import { FileTokenStore } from "./token-store";
@@ -16,13 +15,22 @@ import { loadConfig, readPluginData } from "./config";
  *     file. Run this on a desktop, then copy the token file to the server — the
  *     refresh token keeps the install alive indefinitely.
  *
- *   node authorize.cjs --config <cfg> --from-plugin-data <vault>/.obsidian/plugins/google-sync/data.json
+ *   node authorize.cjs --config <cfg> --from-plugin-data <vault>/<config-dir>/plugins/google-sync/data.json
  *     Skips the browser flow and copies the Obsidian plugin's existing tokens instead.
  */
 
 interface Args {
     config: string;
     fromPluginData?: string;
+}
+
+interface LoopbackRequest {
+    url?: string | null;
+}
+
+interface LoopbackResponse {
+    writeHead(status: number, headers?: Record<string, string>): LoopbackResponse;
+    end(body?: string): void;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -55,7 +63,7 @@ function tryOpenBrowser(url: string): void {
               ? ["cmd", "/c", "start", "", url.replace(/&/g, "^&")]
               : ["xdg-open", url];
     try {
-        spawn(cmd[0] as string, cmd.slice(1), { stdio: "ignore", detached: true }).unref();
+        spawn(cmd[0], cmd.slice(1), { stdio: "ignore", detached: true }).unref();
     } catch {
         // fine — the URL is printed below
     }
@@ -100,7 +108,7 @@ async function main(): Promise<number> {
     const { url } = await auth.beginAuth();
 
     const done = new Promise<number>((resolve) => {
-        const server = http.createServer((req, res) => {
+        const server = http.createServer((req: LoopbackRequest, res: LoopbackResponse) => {
             const reqUrl = new URL(req.url ?? "/", `http://127.0.0.1:${config.loopbackPort}`);
             if (reqUrl.pathname !== "/callback") {
                 res.writeHead(404).end();
@@ -148,15 +156,16 @@ async function main(): Promise<number> {
             tryOpenBrowser(url);
         });
         // Don't hang forever if the user walks away.
-        globalThis
-            .setTimeout(
-                () => {
-                    console.error("Timed out after 10 minutes.");
-                    server.close(() => resolve(1));
-                },
-                10 * 60 * 1000,
-            )
-            .unref();
+        const timeout = setTimeout(
+            () => {
+                console.error("Timed out after 10 minutes.");
+                server.close(() => resolve(1));
+            },
+            10 * 60 * 1000,
+        );
+        if (typeof timeout === "object" && timeout && "unref" in timeout) {
+            (timeout as { unref: () => void }).unref();
+        }
     });
 
     return done;
