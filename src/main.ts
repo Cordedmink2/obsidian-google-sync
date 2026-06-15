@@ -339,16 +339,16 @@ export default class GoogleSyncPlugin extends Plugin {
         try {
             const pending = await this.router.previewAll();
             if (!pending.length) {
-                new Notice("google-sync: everything is up to date — nothing to push.");
+                new Notice("Google sync: everything is up to date — nothing to push.");
                 return;
             }
             const lines = pending.map(
                 (p) =>
                     `${p.path}: ${p.veto ? `BLOCKED (${p.veto})` : p.changedKeys.join(", ") || "(meet link request)"}`,
             );
-            console.info("[google-sync] pending updates:\n" + lines.join("\n"));
+            console.debug("[google-sync] pending updates:\n" + lines.join("\n"));
             new Notice(
-                `google-sync: ${pending.length} note(s) have pending updates (details in console).`,
+                `Google sync: ${pending.length} note(s) have pending updates (details in console).`,
                 8000,
             );
         } catch (e) {

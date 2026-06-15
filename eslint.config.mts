@@ -43,8 +43,25 @@ export default defineConfig(
     {
         // Tests hard-delete files for deterministic cleanup; trashFile would litter .trash.
         files: ["test/**/*.ts"],
+        languageOptions: { globals: { ...globals.node } },
         plugins: { obsidianmd },
-        rules: { "obsidianmd/prefer-file-manager-trash-file": "off" },
+        rules: {
+            "import/no-nodejs-modules": "off",
+            "no-undef": "off",
+            "obsidianmd/prefer-file-manager-trash-file": "off",
+        },
+    },
+    {
+        // Node-only command-line tooling is not part of the Obsidian runtime bundle.
+        files: ["headless/**/*.ts", "scripts/**/*.{js,cjs,mjs}"],
+        languageOptions: { globals: { ...globals.node } },
+        rules: {
+            "import/no-nodejs-modules": "off",
+            "no-console": "off",
+            "no-restricted-globals": "off",
+            "no-undef": "off",
+            "obsidianmd/hardcoded-config-path": "off",
+        },
     },
     eslintConfigPrettier,
     globalIgnores([

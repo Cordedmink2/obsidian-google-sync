@@ -2,7 +2,7 @@ import { describe, it } from "mocha";
 import { expect } from "chai";
 import { GoogleCalendarClient } from "../../src/google/calendar";
 import { GoogleApiError } from "../../src/google/api";
-import { emptyResp, fakeHttp, jsonResp, noWaitRetry, token } from "./helpers/fakeHttp";
+import { fakeHttp, jsonResp, noWaitRetry, token } from "./helpers/fakeHttp";
 
 describe("GoogleCalendarClient", () => {
     it("inserts an event with bearer auth and JSON body", async () => {

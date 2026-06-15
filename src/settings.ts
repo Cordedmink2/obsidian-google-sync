@@ -43,7 +43,11 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
         name: string,
         desc: string,
         key: keyof GoogleSyncSettings,
-        options: { placeholder?: string; validate?: Validator; normalize?: (v: string) => string } = {},
+        options: {
+            placeholder?: string;
+            validate?: Validator;
+            normalize?: (v: string) => string;
+        } = {},
     ): void {
         new Setting(this.containerEl)
             .setName(name)
@@ -444,7 +448,7 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
                     };
                     await this.plugin.saveSettings();
                     this.display();
-                    new Notice("google-sync: settings reset (credentials kept).");
+                    new Notice("Google sync: settings reset (credentials kept).");
                 }),
             );
     }

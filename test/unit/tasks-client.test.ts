@@ -2,7 +2,7 @@ import { describe, it } from "mocha";
 import { expect } from "chai";
 import { GoogleTasksClient } from "../../src/google/tasks";
 import { GoogleApiError } from "../../src/google/api";
-import { emptyResp, fakeHttp, jsonResp, noWaitRetry, token } from "./helpers/fakeHttp";
+import { fakeHttp, jsonResp, noWaitRetry, token } from "./helpers/fakeHttp";
 
 describe("GoogleTasksClient", () => {
     it("lists task lists", async () => {
