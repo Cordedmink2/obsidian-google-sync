@@ -94,13 +94,18 @@ describe("startup Google import", function () {
                 const old = app.vault.getAbstractFileByPath(path);
                 if (old instanceof obsidian.TFile) await app.vault.delete(old);
             }
+            const future = new Date();
+            future.setDate(future.getDate() + 30);
+            const eventDate = future.toISOString().slice(0, 10);
+            future.setDate(future.getDate() + 1);
+            const taskDue = `${future.toISOString().slice(0, 10)}T00:00:00.000Z`;
             await app.vault.create(
                 "events/imported-appointment-import-event-1.md",
-                "---\ntitle: Local edited appointment\ndate: 2026-06-02T09:00:00+12:00\ngoogleId: import-event-1\ncalendarId: primary\n---\n",
+                `---\ntitle: Local edited appointment\ndate: ${eventDate}T09:00:00+12:00\ngoogleId: import-event-1\ncalendarId: primary\n---\n`,
             );
             await app.vault.create(
                 "tasks/imported-task-import-task-1.md",
-                "---\ntitle: Local edited task\ndue: 2026-06-01T00:00:00.000Z\ncompleted: false\ngoogleId: import-task-1\ntasklist: L1\n---\n",
+                `---\ntitle: Local edited task\ndue: ${taskDue}\ncompleted: false\ngoogleId: import-task-1\ntasklist: L1\n---\n`,
             );
         });
         await resetMockCalls();
