@@ -1,8 +1,5 @@
-const execFile = require("child_" + "process").execFile;
-const promisify = require("ut" + "il").promisify;
 import { HeadlessGitConfig } from "./config";
-
-const execFileAsync = promisify(execFile);
+import { execFileAsync } from "./node-runtime";
 
 export type GitRunner = (args: string[]) => Promise<string>;
 

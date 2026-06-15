@@ -1,5 +1,4 @@
-const http = require("ht" + "tp");
-const spawn = require("child_" + "process").spawn;
+import { http, setTimer, spawn } from "./node-runtime";
 import { DEFAULT_SCOPES, GoogleAuth } from "../src/google/auth";
 import { nodeFetchHttp } from "./transport";
 import { FileTokenStore } from "./token-store";
@@ -62,8 +61,10 @@ function tryOpenBrowser(url: string): void {
             : process.platform === "win32"
               ? ["cmd", "/c", "start", "", url.replace(/&/g, "^&")]
               : ["xdg-open", url];
+    const command = cmd[0];
+    if (!command) return;
     try {
-        spawn(cmd[0], cmd.slice(1), { stdio: "ignore", detached: true }).unref();
+        spawn(command, cmd.slice(1), { stdio: "ignore", detached: true }).unref();
     } catch {
         // fine — the URL is printed below
     }
@@ -156,16 +157,14 @@ async function main(): Promise<number> {
             tryOpenBrowser(url);
         });
         // Don't hang forever if the user walks away.
-        const timeout = setTimeout(
+        const timeout = setTimer(
             () => {
                 console.error("Timed out after 10 minutes.");
                 server.close(() => resolve(1));
             },
             10 * 60 * 1000,
         );
-        if (typeof timeout === "object" && timeout && "unref" in timeout) {
-            (timeout as { unref: () => void }).unref();
-        }
+        timeout.unref();
     });
 
     return done;

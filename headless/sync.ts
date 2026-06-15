@@ -1,7 +1,4 @@
-const fs = require("f" + "s").promises;
-const nodePath = require("pa" + "th");
-const os = require("o" + "s");
-const createHash = require("cry" + "pto").createHash;
+import { createHash, fs, nodePath, os } from "./node-runtime";
 import { GoogleAuth, DEFAULT_SCOPES } from "../src/google/auth";
 import { GoogleCalendarClient } from "../src/google/calendar";
 import { GoogleTasksClient } from "../src/google/tasks";

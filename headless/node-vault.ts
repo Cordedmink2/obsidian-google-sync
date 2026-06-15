@@ -1,5 +1,4 @@
-const fs = require("f" + "s").promises;
-const nodePath = require("pa" + "th");
+import { fs, nodePath } from "./node-runtime";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { VaultNoteRef, VaultPort } from "../src/vault/port";
 import { basenameOf, normalizeVaultPath } from "../src/vault/paths";
