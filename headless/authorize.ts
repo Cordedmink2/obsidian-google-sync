@@ -129,7 +129,11 @@ async function main(): Promise<number> {
                     console.log(
                         "If the sync runs on another machine, copy that file there (chmod 600).",
                     );
-                    finish(200, "Connected — you can close this tab and return to the terminal.", 0);
+                    finish(
+                        200,
+                        "Connected — you can close this tab and return to the terminal.",
+                        0,
+                    );
                 })
                 .catch((e: Error) => {
                     console.error(`Token exchange failed: ${e.message}`);
@@ -144,13 +148,15 @@ async function main(): Promise<number> {
             tryOpenBrowser(url);
         });
         // Don't hang forever if the user walks away.
-        setTimeout(
-            () => {
-                console.error("Timed out after 10 minutes.");
-                server.close(() => resolve(1));
-            },
-            10 * 60 * 1000,
-        ).unref();
+        globalThis
+            .setTimeout(
+                () => {
+                    console.error("Timed out after 10 minutes.");
+                    server.close(() => resolve(1));
+                },
+                10 * 60 * 1000,
+            )
+            .unref();
     });
 
     return done;

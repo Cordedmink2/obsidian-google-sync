@@ -64,7 +64,16 @@ export async function withRetry(
     const retries = opts.retries ?? 4;
     const base = opts.baseDelayMs ?? 500;
     const max = opts.maxDelayMs ?? 16000;
-    const sleep = opts.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+    const sleep =
+        opts.sleep ??
+        ((ms: number) =>
+            new Promise((resolve) => {
+                if (typeof window !== "undefined" && typeof window.setTimeout === "function") {
+                    window.setTimeout(resolve, ms);
+                } else {
+                    globalThis.setTimeout(resolve, ms);
+                }
+            }));
     const random = opts.random ?? Math.random;
 
     let attempt = 0;

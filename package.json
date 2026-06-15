@@ -1,6 +1,6 @@
 {
     "name": "obsidian-google-sync",
-    "version": "0.3.0",
+    "version": "0.3.2",
     "description": "Keep your vault in sync with Google Calendar and Google Tasks: import events and tasks as notes, push edits back, never create or delete on the Google side.",
     "main": "main.js",
     "scripts": {
@@ -15,7 +15,9 @@
         "test": "run-s test:*",
         "test:unit": "tsc --noEmit && mocha",
         "test:e2e": "wdio run ./wdio.conf.mts",
-        "test-android": "wdio run ./wdio.mobile.conf.mts"
+        "test-android": "wdio run ./wdio.mobile.conf.mts",
+        "check:runtime-bundle": "npm run build && node scripts/check-runtime-bundle.mjs",
+        "check:release-metadata": "node scripts/check-release-metadata.mjs"
     },
     "keywords": [
         "obsidian",

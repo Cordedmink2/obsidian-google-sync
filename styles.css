@@ -1,5 +1,6 @@
 /* Inline validation state for Google sync settings inputs. */
-.gsync-invalid {
-    border-color: var(--text-error) !important;
+.gsync-invalid,
+.setting-item .gsync-invalid {
+    border-color: var(--text-error);
     box-shadow: 0 0 0 1px var(--text-error);
 }

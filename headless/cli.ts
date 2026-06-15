@@ -121,7 +121,9 @@ async function readJsonInput(flags: Flags): Promise<Record<string, unknown>> {
         raw = await new Promise<string>((resolve, reject) => {
             let data = "";
             process.stdin.setEncoding("utf8");
-            process.stdin.on("data", (c) => (data += c));
+            process.stdin.on("data", (chunk: string) => {
+                data += chunk;
+            });
             process.stdin.on("end", () => resolve(data));
             process.stdin.on("error", reject);
         });

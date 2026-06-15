@@ -296,3 +296,7 @@ More developer and test notes:
 - [Google setup guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/google-setup.md)
 - [iOS checklist](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/ios-checklist.md)
 - [Contributing](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/CONTRIBUTING.md)
+
+### Headless CLI tooling
+
+This repository includes `headless/` TypeScript utilities for local command-line testing and automation. These files use Node.js APIs such as `fs`, `path`, `process`, and `child_process`, but they are not part of the Obsidian plugin runtime bundle loaded from `main.js`. The published plugin release assets are `main.js`, `manifest.json`, and `styles.css`.
