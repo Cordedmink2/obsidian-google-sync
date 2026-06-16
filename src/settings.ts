@@ -250,13 +250,13 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName("Setup help")
             .setDesc(
-                "Create a Google Cloud project, enable the Google Calendar API and Google Tasks API, add yourself as a test user, create a web application OAuth client, then paste the values below.",
+                "Most people should follow the setup guide first. It walks through the no-code setup path, then explains the advanced bring-your-own-host option.",
             )
             .addButton((b) =>
                 b.setButtonText("Open setup guide").onClick(() => window.open(SETUP_GUIDE_URL, "_blank")),
             )
             .addButton((b) =>
-                b.setButtonText("Google Cloud links").onClick(() => {
+                b.setButtonText("Open Google setup pages").onClick(() => {
                     for (const link of GOOGLE_LINKS) window.open(link.url, "_blank");
                     new Notice("Opened Google Cloud setup pages in your browser.");
                 }),
@@ -315,6 +315,35 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
                 validate: redirectUriWarning,
             },
         );
+        new Setting(containerEl)
+            .setName("Bridge URL tools")
+            .setDesc("Open or copy the redirect bridge URL after you paste it above.")
+            .addButton((b) =>
+                b.setButtonText("Open bridge URL").onClick(() => {
+                    const url = normalizeRedirectUri(this.plugin.settings.redirectUri);
+                    if (!url) {
+                        new Notice("Paste a redirect bridge URL first.");
+                        return;
+                    }
+                    window.open(url, "_blank");
+                }),
+            )
+            .addButton((b) =>
+                b.setButtonText("Copy bridge URL").onClick(async () => {
+                    const url = normalizeRedirectUri(this.plugin.settings.redirectUri);
+                    if (!url) {
+                        new Notice("Paste a redirect bridge URL first.");
+                        return;
+                    }
+                    try {
+                        await navigator.clipboard.writeText(url);
+                        new Notice("Copied bridge URL.");
+                    } catch (e) {
+                        console.warn("[google-sync] could not copy bridge URL:", e);
+                        new Notice("Copy failed. Select the bridge URL field and copy it manually.");
+                    }
+                }),
+            );
 
         this.autoLoadPickers(connected);
 

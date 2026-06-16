@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Google Sync — returning to Obsidian</title>
+        <style>
+            body {
+                font-family: system-ui, sans-serif;
+                max-width: 32rem;
+                margin: 4rem auto;
+                padding: 0 1rem;
+                line-height: 1.5;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Returning to Obsidian…</h1>
+        <p id="msg">One moment.</p>
+        <!--
+            One-file static OAuth redirect bridge for Google Calendar and Tasks Sync.
+            Host this exact file as index.html on any HTTPS static host, then register
+            that public URL as the Authorized redirect URI in your Google OAuth Web
+            application client and in the plugin's Redirect bridge URL setting.
+
+            This page contains no secrets. It only forwards Google's single-use
+            authorization code + state to obsidian://google-sync. The PKCE verifier
+            and token exchange stay inside Obsidian.
+        -->
+        <script>
+            function computeBridgeRedirect(search) {
+                const p = new URLSearchParams(search || "");
+                const error = p.get("error");
+                const code = p.get("code");
+                const state = p.get("state");
+                if (error) {
+                    return { target: "obsidian://google-sync?error=" + encodeURIComponent(error) };
+                }
+                if (code && state) {
+                    return {
+                        target:
+                            "obsidian://google-sync?code=" +
+                            encodeURIComponent(code) +
+                            "&state=" +
+                            encodeURIComponent(state),
+                    };
+                }
+                return {
+                    target: null,
+                    message: "Missing authorization code. Please retry from Obsidian.",
+                };
+            }
+
+            const r = computeBridgeRedirect(window.location.search);
+            const msg = document.getElementById("msg");
+            if (!r.target) {
+                msg.textContent = r.message;
+            } else {
+                window.location.href = r.target;
+                msg.textContent = "If Obsidian did not open automatically, ";
+                const link = document.createElement("a");
+                link.textContent = "tap here";
+                link.setAttribute("href", r.target);
+                msg.appendChild(link);
+                msg.appendChild(document.createTextNode("."));
+            }
+        </script>
+    </body>
+</html>

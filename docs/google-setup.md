@@ -29,7 +29,23 @@ You will:
 
 - A Google account.
 - A computer with Obsidian and this plugin installed.
-- A free **GitHub account** (used for the easiest redirect-page option below). If you'd rather use another host, that works too.
+- A free **GitHub account** if you want the no-code bridge-hosting path below. If you already know how to publish a tiny static web page, you can use that instead.
+
+## Choose your setup path
+
+### Path A — simplest, no-code setup (recommended for most people)
+
+Use GitHub Pages to host the tiny return page for you. You do not write code or run commands. You click through Google Cloud, click through GitHub, paste three values into Obsidian, then connect.
+
+Use Path A if you think “OAuth client”, “redirect URI”, or “static host” sounds unfamiliar.
+
+### Path B — advanced / bring your own host
+
+If you are comfortable with static hosting, publish the bridge yourself on Cloudflare Pages, Netlify, your own website, or any HTTPS host. You can either upload the repo’s `bridge/` folder or publish the single-file bridge at [`docs/bridge-one-file.html`](bridge-one-file.html) as `index.html`.
+
+Use Path B if you want more control over the bridge URL or already have hosting.
+
+The Google Cloud steps are the same for both paths. The only difference is how you get your **Redirect bridge URL**.
 
 ## Fast exact-match checklist
 
@@ -88,7 +104,9 @@ This is the only tricky part — take your time, it's a one-time thing.
 
 The plugin includes a tiny page (in the `bridge/` folder) that does one job: catch Google's reply and hand it back to Obsidian. It contains **no secrets** and can't do anything on its own.
 
-### Easiest path: GitHub Pages (free, no command line)
+### Path A: GitHub Pages (free, no command line)
+
+GitHub calls your own copy of a project a “fork”. In this step, you make your own copy so GitHub can host the tiny return page for you.
 
 1. Open this project on GitHub and click **Fork** (top-right) to make your own copy.
 2. In **your fork**, go to **Settings → Pages**.
@@ -104,9 +122,13 @@ https://YOUR-USERNAME.github.io/obsidian-google-sync/
 
 This is your **Redirect bridge URL**. Keep it handy for Steps 5 and 6.
 
-### Prefer a different host?
+### Path B: use another HTTPS host
+
+Use this if you already know how to publish a static `index.html` file. If that sounds unfamiliar, use Path A above instead.
 
 Upload everything inside the `bridge/` folder to any HTTPS static host (Cloudflare Pages, Netlify, your own site, etc.) and use the resulting `https://…` address as your bridge URL.
+
+If your host is easiest with one file, copy [`docs/bridge-one-file.html`](bridge-one-file.html), publish it as `index.html`, and use that public `https://…/` address as your bridge URL. It is the same bridge logic in a single self-contained file.
 
 ✅ **Done when:** opening your bridge URL in a browser loads a page (it'll say it's missing a code — that's expected).
 
