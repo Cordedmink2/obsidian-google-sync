@@ -211,7 +211,9 @@ Run **Validate setup** first. It checks the local fields and, once connected, ch
 
 ### Screenshot checklist for this guide
 
-If you are improving these docs, screenshots should show:
+If you are improving these docs, the [Simple Google setup guide](google-setup-simple.md#screenshots-needed-for-this-guide) has a complete screenshot table with per-step capture instructions, filenames, and placement guidance. The same screenshots apply here.
+
+Summary of what to capture:
 
 1. Google Cloud project picker and **New project**.
 2. API Library search results for **Google Calendar API** and **Google Tasks API**.
@@ -226,6 +228,8 @@ If you are improving these docs, screenshots should show:
 11. Obsidian plugin settings with Client ID, Client secret, and Redirect bridge URL.
 12. Google consent page, successful bridge return, and Obsidian's connected notice.
 13. A `redirect_uri_mismatch` screenshot annotated with the exact-match checklist.
+
+Place images in `docs/screenshots/` and reference them as `![alt](./screenshots/filename.png)`.
 
 ## Privacy reminders
 

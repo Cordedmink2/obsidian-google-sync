@@ -151,3 +151,39 @@ Open your Redirect bridge URL directly. If it loads, the web page is working. Th
 ### I am technical and want another hosting option
 
 Use the advanced guide: [Google setup guide](google-setup.md). You can publish [`bridge/`](../bridge/) or the single-file bridge at [bridge-one-file.html](bridge-one-file.html) on any HTTPS static host.
+
+---
+
+## Screenshots needed for this guide
+
+If you are helping improve this documentation, here is exactly what to capture for each step. Names in parentheses are the filenames to use.
+
+| Step | What to screenshot | What to do | Suggested filename |
+|------|-------------------|------------|-------------------|
+| 1 | Google Cloud project picker with **New project** visible | Open <https://console.cloud.google.com/> while signed in. The project picker is at the top. Click it, then screenshot the dropdown with "New project" shown. | `step-01-project-picker.png` |
+| 2 | API Library search results for **Google Calendar API** | Open the [API Library](https://console.cloud.google.com/apis/library), search for `Google Calendar API`, wait for results, screenshot showing the API card with the **Enable** button. | `step-02a-calendar-api.png` |
+| 2b | API Library search results for **Google Tasks API** | Same but search for `Google Tasks API`. | `step-02b-tasks-api.png` |
+| 3a | Google Auth Platform branding page with app name filled in | Open <https://console.cloud.google.com/auth/branding>, fill in app name + emails, screenshot showing the filled form. | `step-03a-branding.png` |
+| 3b | **Audience → Test users** with your email added | Open <https://console.cloud.google.com/auth/audience>, add your email under Test users, screenshot showing it listed. | `step-03b-test-users.png` |
+| 4a | GitHub **Fork** button | Open the [plugin repo](https://github.com/Cordedmink2/obsidian-google-sync) while signed into GitHub. The Fork button is top-right. Screenshot with cursor near it. | `step-04a-fork-button.png` |
+| 4b | GitHub **Settings → Pages** with GitHub Actions selected | In your fork, open Settings → Pages. Show the Build and deployment section with "GitHub Actions" selected. | `step-04b-pages-settings.png` |
+| 4c | GitHub **Actions → Deploy OAuth bridge → Run workflow** | Open the Actions tab, find the workflow, show the "Run workflow" button. | `step-04c-run-workflow.png` |
+| 4d | The published Pages URL | After the workflow finishes, show Settings → Pages with the live URL circled/highlighted. | `step-04d-pages-url.png` |
+| 5a | Google Auth Platform **Clients** page with create button | Open <https://console.cloud.google.com/auth/clients>, show the "Create client" button. | `step-05a-clients-page.png` |
+| 5b | OAuth client creation form with **Web application** selected and redirect URI filled in | Fill in the form: app type = Web application, paste the bridge URL under Authorized redirect URIs. Screenshot showing both fields filled. | `step-05b-oauth-form.png` |
+| 5c | The popup showing Client ID and Client secret | After clicking Create, the popup with your new Client ID and Client secret. Screenshot showing them both. | `step-05c-client-credentials.png` |
+| 6 | Obsidian settings tab with the three fields filled in | Open Obsidian → Settings → Google Calendar and Tasks Sync. Fill in Client ID, Client secret, and Redirect bridge URL (blur/redact any secret values). Screenshot showing all three fields. | `step-06-obsidian-settings.png` |
+| Connect | Google consent page | After clicking Connect in Obsidian, the Google consent screen showing the requested Calendar and Tasks permissions. Screenshot with the Continue/Allow button visible. | `step-consent-screen.png` |
+| Connected | Obsidian showing "Connected" notice | After Google redirects back, show the Obsidian notice saying "Connected to Google" or "Connection OK" from Test connection. | `step-connected-notice.png` |
+| Error | `redirect_uri_mismatch` error page | If you trigger this error on purpose, screenshot the Google error page showing the mismatch details. Annotate it with a red box or arrow pointing to the mismatch. | `step-error-mismatch.png` |
+
+### Image placement
+
+Once captured, add images inline next to each step like this:
+
+```markdown
+![Project picker with New project highlighted](./screenshots/step-01-project-picker.png)
+```
+
+Create a `docs/screenshots/` folder and place all images there.
+
