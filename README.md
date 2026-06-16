@@ -1,128 +1,92 @@
 # Google Calendar and Tasks Sync
 
-Keep your Obsidian notes in sync with **Google Calendar** and **Google Tasks** — on desktop and mobile.
+Sync Google Calendar events and Google Tasks into an Obsidian vault, then push edits back to existing Google items.
 
-This plugin is for people who like planning in Markdown but still want their calendar and task list available everywhere Google works.
+Google remains the source of truth for whether an event or task exists. The plugin imports and updates notes, but it does not create or delete items in Google.
 
-## What it syncs
+## What it does
 
-- 📅 Google Calendar events become notes in **`events/`**.
-- ✅ Google Tasks become notes in **`tasks/`**.
-- Editing an imported note (one with a `googleId`) updates the Google item — change fields, complete/uncomplete tasks, link tasks to events.
-- Past events and old tasks can be tidied into archive/overdue/completed folders.
+- Imports Google Calendar events into `events/`.
+- Imports Google Tasks into `tasks/`.
+- Updates Google when you edit an imported note that has a `googleId`.
+- Moves old events, overdue tasks, completed tasks, and confirmed Google-side deletions into archive folders instead of deleting local notes.
 
-## Important sync model
+## Sync model
 
-Google is the **source of truth for existence** — the plugin can never create or delete anything in your Google account:
+- **Google to Obsidian:** imports create or update notes.
+- **Obsidian to Google:** edits to linked notes patch the existing Google item.
+- **Local-only notes:** notes without `googleId` are never pushed to Google.
+- **Deletions:** deleting or renaming a note never deletes anything in Google. If Google deletes an item, the note is moved to `orphaned/` on import.
+- **Opt out per note:** set `syncDirection: pull-only` to prevent local edits from pushing.
 
-- **Google → Obsidian:** import creates and updates notes (manual via **Import events and tasks from Google**, or optionally on startup).
-- **Obsidian → Google:** edits to notes that already have a `googleId` are pushed as updates while Obsidian is open (toggleable). Notes without a `googleId` are local-only; deleting or renaming a note never touches Google.
-- **Per-note opt-out:** set `syncDirection: pull-only` in a note's frontmatter to stop its edits from pushing to Google (imports still update it).
-- **Deletions in Google:** when an event/task is deleted on the Google side, its note is moved to an `orphaned/` subfolder on the next import — never deleted.
-- **Corruption guards:** pushes are diff-based (only fields you actually changed are sent, verified against the last imported state), patches that look like template clobbers are refused, and more than a configurable number of pending updates in one run requires explicit confirmation (**Push pending updates (confirmed)**). **Preview pending Google updates** shows a dry run.
-
-## Import settings
-
-When pulling from Google (manual import or import-on-startup), these settings keep the volume sane and stop your vault filling with thousands of notes:
-
-- **Import window — days past / days ahead:** only events inside this window are imported. Defaults are **7 days past** and **90 days ahead**. Recurring events are expanded into one note per occurrence, so a wide window pulls a lot of notes — widen it deliberately.
-- **Recurring event filter:** controls which repeating events (lectures, standups, weekly 1:1s) get imported. One-off events are always imported.
-    - **Allowlist** (default): import only recurring events whose title matches one of your patterns. An **empty allowlist imports no recurring events** — this is the strict default, so add titles to opt them in.
-    - **Blocklist:** import every recurring event _except_ those whose title matches. An empty blocklist imports them all.
-- **Recurring event titles:** one title per line, with `*` as a wildcard (e.g. `Weekly*`, `Standup*`). Used by whichever mode is selected above. Matching is case-insensitive.
-
-These only affect what is _imported from_ Google.
+Pushes are diff-based and checked against the last imported state. Large batches require explicit confirmation with **Push pending updates (confirmed)**. Use **Preview pending Google updates** for a dry run.
 
 ## Install
 
-### From Obsidian Community Plugins
+### Community plugin
 
-1. Open Obsidian.
-2. Go to **Settings → Community plugins**.
-3. Turn off **Restricted mode** if needed.
-4. Select **Browse**.
-5. Search for **Google Calendar and Tasks Sync**.
-6. Select **Install**, then **Enable**.
+1. Open **Settings → Community plugins** in Obsidian.
+2. Turn off **Restricted mode** if needed.
+3. Select **Browse**.
+4. Search for **Google Calendar and Tasks Sync**.
+5. Select **Install**, then **Enable**.
 
-### Manual install (GitHub release)
+### Manual install
 
-1. Download `main.js`, `manifest.json`, and `styles.css` from the latest GitHub release.
-2. In your vault, create:
+Download `main.js`, `manifest.json`, and `styles.css` from the latest GitHub release and place them in:
 
-    ```text
-    .obsidian/plugins/google-sync/
-    ```
+```text
+.obsidian/plugins/google-sync/
+```
 
-3. Put the three downloaded files in that folder.
-4. Restart Obsidian.
-5. Go to **Settings → Community plugins** and enable **Google Calendar and Tasks Sync**.
+Restart Obsidian and enable the plugin.
 
 ## First-time setup
 
-The plugin needs your own Google OAuth client. This avoids any shared hosted backend and keeps Google tokens in your vault’s local plugin data.
+The plugin uses your own Google OAuth client. Tokens and settings stay in your vault's local plugin data.
 
-Follow the full guide here:
+Full guide: [Google setup guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/google-setup.md)
 
-- [Google setup guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/google-setup.md)
-
-Short version:
+Essential steps:
 
 1. Create or choose a Google Cloud project.
-2. Enable **Google Calendar API** and **Google Tasks API**.
+2. Enable the Google Calendar API and Google Tasks API.
 3. Configure the OAuth consent screen.
-4. Host the tiny redirect bridge page included in this repo.
+4. Host the redirect bridge page from this repo.
 5. Create a **Web application** OAuth client.
-6. Paste the client ID, client secret, and bridge URL into the plugin settings.
-7. Run **Connect to Google** from Obsidian’s command palette.
+6. Paste the client ID, client secret, and bridge URL into plugin settings.
+7. Run **Connect to Google**.
 8. Run **Validate setup**.
 
-For iPhone/iPad setup and checks, use:
+For iPhone and iPad, use the [iOS checklist](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/ios-checklist.md).
 
-- [iOS checklist](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/ios-checklist.md)
+## Import settings
 
-## Optional: Templater workflow (recommended)
+Importing is bounded so a vault is not filled with old or recurring events.
 
-If you use the **Templater** community plugin, you can auto-insert valid event/task frontmatter when creating new notes.
+- **Days past / days ahead:** event import window. Defaults: 7 days past, 90 days ahead.
+- **Recurring event filter:** allowlist or blocklist recurring event titles. One-off events are always imported.
+- **Recurring event titles:** one title per line. `*` works as a wildcard.
 
-- Full guide: [Templater setup](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/templater-setup.md)
-- Quick install link: `obsidian://show-plugin?id=templater-obsidian`
-- One-command scaffold:
-
-```bash
-./scripts/setup-templater.sh /path/to/your/vault --configure-templater
-```
-
-This creates event/task templates and can auto-configure Templater’s template folder + trigger-on-create setting.
-
-Then add folder mappings in Obsidian Templater:
-
-- `events` → `templates/google-sync/event-template.md`
-- `tasks` → `templates/google-sync/task-template.md`
-
-Quick smoke test from terminal:
-
-```bash
-./scripts/verify-setup.sh /path/to/your/vault
-./scripts/bootstrap-sample-notes.sh /path/to/your/vault
-```
-
-Screenshot walkthrough: [Templater setup screenshots](https://github.com/Cordedmink2/obsidian-google-sync/tree/main/docs/assets/templater)
+These settings only affect imports from Google.
 
 ## Commands
 
-Open Obsidian’s command palette and search for these commands:
+Search for these commands in Obsidian's command palette:
 
-- **Connect to Google** — sign in once and store Google tokens in the plugin data file.
-- **Sync now** — push matching Obsidian notes to Google.
-- **Import events and tasks from Google** — pull Google items into your vault. By default it only imports the configured calendar and task list, within the import window, to avoid vault spam. Recurring events are filtered by the allowlist/blocklist (see [Import settings](#import-settings)).
-- **Run lifecycle scan** — move past events to `events/archive/`, overdue tasks to `tasks/overdue/`, and completed tasks to `tasks/completed/`.
-- **Test connection** — quick Google connectivity check.
-- **Validate setup** — checks OAuth settings, Google connection, selected calendar, and selected task list.
-- **Disconnect from Google** — remove stored Google tokens.
+- **Connect to Google**
+- **Import events and tasks from Google**
+- **Sync now**
+- **Preview pending Google updates**
+- **Push pending updates (confirmed)**
+- **Run lifecycle scan**
+- **Test connection**
+- **Validate setup**
+- **Disconnect from Google**
 
 ## Folder layout
 
-The defaults are:
+Default folders:
 
 ```text
 events/
@@ -134,13 +98,13 @@ tasks/completed/
 tasks/orphaned/
 ```
 
-`orphaned/` holds notes whose Google item was deleted on the Google side: an import confirms the deletion with a direct lookup, then files the note there instead of deleting anything locally.
+Change folder names in settings before first sync if you want a different layout.
 
-You can change the folder names in plugin settings before you start syncing.
+## Note format
 
-## Event note example
+Imported notes use YAML frontmatter. Keep the `googleId` field; it links the note to Google.
 
-An imported event note under `events/` looks like this — edit any of these fields and the change is pushed to the Google event:
+Event example:
 
 ```yaml
 ---
@@ -149,154 +113,77 @@ date: 2026-06-02T10:00
 end: 2026-06-02T11:00
 timezone: Pacific/Auckland
 location: Wellington
-description: Catch-up about Q3 plan
 status: confirmed
-visibility: default
-transparency: opaque # opaque = busy, transparent = free
-eventType: meeting
-color: "7" # Google Calendar colorId (1-11)
-guestsCanInviteOthers: true
-guestsCanModify: false
-guestsCanSeeOtherGuests: true
-reminders:
-    useDefault: false
-    overrides:
-        - method: popup
-          minutes: 10
-attendees:
-    required:
-        - alex@example.com
-    optional:
-        -
-recurrence: RRULE:FREQ=WEEKLY;BYDAY=MO # or a YAML list of RRULE/EXDATE/RDATE lines
+googleId: example-event-id
 ---
-Notes for myself stay here, in Obsidian.
+Notes stay in Obsidian.
 ```
 
-`recurrence` accepts either a single rule string or a YAML list when you need exceptions, e.g.:
-
-```yaml
-recurrence:
-    - RRULE:FREQ=WEEKLY;BYDAY=MO
-    - EXDATE;TZID=Pacific/Auckland:20260615T100000
-```
-
-### More event fields
-
-- **Google Meet:** add `conferencing: true` and the plugin asks Google to create a Meet link on the next sync, then writes the resolved URL back into a read-only `meetLink` field.
-- **Detailed attendees:** instead of the `required`/`optional` email lists, you can use a YAML list of objects to see and set response status, names, organizer/resource flags. Imported events use this richer form automatically when Google sends that detail:
-
-    ```yaml
-    attendees:
-        - email: alex@example.com
-          displayName: Alex
-          responseStatus: accepted # needsAction | declined | tentative | accepted
-          organizer: true
-        - email: room-3@resource.calendar.google.com
-          resource: true
-    ```
-
-- **Attachments:** a `attachments` list of `{ fileUrl, title, mimeType }` (Google requires Drive file URLs).
-- **Source:** a `source: { title, url }` linking the event back to where it came from.
-- **transparency:** `opaque` (busy) or `transparent` (free).
-
-The import writes a `googleId` field into the frontmatter. Leave that field alone; it is how the plugin knows which Google event belongs to the note — and only notes that have one push updates.
-
-## Task note example
-
-An imported task note under `tasks/` looks like this:
+Task example:
 
 ```yaml
 ---
 title: Buy milk
-due: 2026-06-01 # deadline (Google Tasks honours the date only)
+due: 2026-06-01
 completed: false
-notes: 2% organic, two cartons # the task's details/notes in Google Tasks
+notes: 2% organic, two cartons
+googleId: example-task-id
 ---
-Free-form note body stays in Obsidian and is not synced.
+Local note body stays in Obsidian.
 ```
 
-`notes` maps to the native Google Tasks **details** field (the body of the note is kept locally and not synced). `due` maps to the native **deadline**. Set `completed: true` and sync to mark the task completed in Google Tasks. With **Auto-archive past events** on, completing a task also files it into `tasks/completed/` straight away — you no longer have to wait for the periodic lifecycle scan.
+The body of a task note is not synced. The `notes` frontmatter field maps to Google Tasks details.
 
-### Subtasks
+## Templater workflow
 
-Google Tasks supports one level of nesting. To make a task a subtask, add a `parent` wikilink pointing at the parent task note:
+Optional guide: [Templater setup](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/templater-setup.md)
 
-```yaml
----
-title: Pick up the car
-parent: "[[Renew registration]]"
----
+Folder mappings:
+
+- `events` → `templates/google-sync/event-template.md`
+- `tasks` → `templates/google-sync/task-template.md`
+
+Smoke test helpers:
+
+```bash
+./scripts/verify-setup.sh /path/to/your/vault
+./scripts/bootstrap-sample-notes.sh /path/to/your/vault
 ```
-
-On sync the plugin nests it under the parent in Google Tasks (both notes must be linked to Google, i.e. have a `googleId`). Subtasks imported from Google get their `parent` wikilink written back automatically.
-
-## Linking tasks to events
-
-You can link task notes to an event so they are completed in Google Tasks automatically when the event passes (and gets archived). On the **event** note, add a `tasks:` list:
-
-```yaml
-tasks:
-    - "[[Pack bags for malaysia]]"
-    - "[[Buy travel adapter]]"
-```
-
-Entries can be Obsidian wikilinks (so they also show up in the graph) or plain note basenames — both work. When the event is archived (its date is more than the configured days in the past), each linked task is marked completed in Google Tasks. Requires **Auto-archive past events** and **Auto-close linked tasks on archive** to be on.
-
-## Obsidian-friendly notes
-
-- Notes use standard YAML frontmatter (Obsidian **Properties**) plus a Markdown body, so wiki links, tags, and embeds work normally.
-- **Importing from Google is non-destructive to your own metadata.** It updates only the fields it manages (title, date, due, etc.); the note body and any extra properties you add (tags, `[[wiki links]]`, your own fields, the event `tasks` list) are preserved across re-imports.
 
 ## Privacy and safety
 
-- The plugin talks directly to Google Calendar and Google Tasks using Obsidian’s `requestUrl` API.
-- It does not include analytics or telemetry.
-- Google OAuth tokens are stored by Obsidian in the plugin’s vault-local `data.json`.
-- Your OAuth client secret is also stored in plugin settings. Treat the vault’s `.obsidian/plugins/google-sync/data.json` as private.
-- The plugin only manages notes inside the configured event/task folders.
-- Startup Google import is off by default and additions-only when enabled.
-- Full privacy details: [PRIVACY.md](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/PRIVACY.md)
-- Security reporting policy: [SECURITY.md](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/SECURITY.md)
+- Google requests are made directly through Obsidian's `requestUrl` API.
+- There is no analytics or telemetry.
+- Tokens and OAuth settings are stored in `.obsidian/plugins/google-sync/data.json`.
+- Treat that file as private.
+- The plugin only manages notes in the configured event and task folders.
+- Startup import is off by default and additions-only when enabled.
+
+See [PRIVACY.md](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/PRIVACY.md) and [SECURITY.md](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/SECURITY.md).
 
 ## Troubleshooting
 
-- Run **Validate setup** first. It gives the clearest checklist of what is missing.
-- If login does not return to Obsidian, check that your Google OAuth redirect URI exactly matches your hosted bridge URL.
-- If a note does not sync, check that it is under the configured `events/` or `tasks/` folder and has the required frontmatter fields.
-- If event times look wrong, add an explicit `timezone` such as `Pacific/Auckland`.
-- Task `due` dates are date-only in Google Tasks. The plugin preserves the calendar date you set (no off-by-one in timezones ahead of UTC); upgrade to 0.1.13+ if "due tomorrow" ever showed as today.
-- If imported notes get overwritten back to a template (e.g. `title: Event title`), see the Templater warning in the [Templater setup guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/templater-setup.md) — don't pair folder templates + trigger-on-creation with Import from Google. Re-running the import restores the real Google data into clobbered notes.
-- Test with a spare Google calendar/task list before using important real data.
+- Run **Validate setup** first.
+- If login does not return to Obsidian, check that your OAuth redirect URI exactly matches the hosted bridge URL.
+- If a note does not sync, check that it is in the configured folder and has `googleId`.
+- If event times look wrong, set `timezone`, for example `Pacific/Auckland`.
+- Test with a spare Google calendar or task list before syncing important data.
 
-## Headless sync (server / cron)
+## Headless sync
 
-The same sync can run on a server without Obsidian — importing into the vault, pushing
-updates, filing lifecycle/orphan moves, and committing + pushing the vault's git repo on
-a schedule. Build with `npm run build:headless` and see the
-[headless guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/headless.md)
-for config, one-time authorization, and cron/systemd examples.
+The same sync engine can run without Obsidian for server or cron use. It can import notes, push edits, run lifecycle filing, and commit the vault to git.
 
-## AI agent skill
-
-`skill/google-tasks-calendar/` is a SKILL.md-format skill that gives AI agents
-(Claude Code, Codex, OpenClaw, Hermes, …) create/read/update access to your Google
-Calendar and Tasks — every writable API field (attendees/invitations, recurrence,
-Meet links, reminders, colors, task details, subtasks), and **no delete capability**.
-Install it into every detected agent with:
+Build with:
 
 ```bash
 npm run build:headless
-node scripts/install-skill.mjs        # or --target <skills-dir>, --list
 ```
 
-More developer and test notes:
+Guide: [headless sync](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/headless.md)
+
+## Developer notes
 
 - [Development guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/development.md)
-- [Google setup guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/google-setup.md)
-- [iOS checklist](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/ios-checklist.md)
 - [Contributing](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/CONTRIBUTING.md)
 
-### Headless CLI tooling
-
-This repository includes `headless/` TypeScript utilities for local command-line testing and automation. These files use Node.js APIs such as `fs`, `path`, `process`, and `child_process`, but they are not part of the Obsidian plugin runtime bundle loaded from `main.js`. The published plugin release assets are `main.js`, `manifest.json`, and `styles.css`.
+The Obsidian plugin runtime is the published `main.js` bundle. The `headless/` TypeScript files are Node-only tooling and are not loaded by Obsidian.

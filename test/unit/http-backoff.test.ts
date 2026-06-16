@@ -125,4 +125,20 @@ describe("withRetry", () => {
         expect(err).to.be.instanceOf(Error);
         expect((err as Error).message).to.equal("always down");
     });
+
+    it("requires an injected sleep outside Obsidian when a retry is needed", async () => {
+        let err: unknown;
+        try {
+            await withRetry(async () => resp(429), {
+                retries: 1,
+                baseDelayMs: 0,
+                maxDelayMs: 0,
+                random: noJitter,
+            });
+        } catch (e) {
+            err = e;
+        }
+        expect(err).to.be.instanceOf(Error);
+        expect((err as Error).message).to.contain("pass RetryOptions.sleep");
+    });
 });

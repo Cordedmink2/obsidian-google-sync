@@ -67,12 +67,16 @@ export async function withRetry(
     const sleep =
         opts.sleep ??
         ((ms: number) =>
-            new Promise((resolve) => {
+            new Promise((resolve, reject) => {
                 if (typeof window !== "undefined" && typeof window.setTimeout === "function") {
                     window.setTimeout(resolve, ms);
-                } else {
-                    window.setTimeout(resolve, ms);
+                    return;
                 }
+                reject(
+                    new Error(
+                        "Retry sleep is unavailable outside Obsidian; pass RetryOptions.sleep.",
+                    ),
+                );
             }));
     const random = opts.random ?? Math.random;
 

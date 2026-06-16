@@ -1,4 +1,4 @@
-import { createHash, fs, nodePath, os } from "./node-runtime";
+import { createHash, fs, nodePath, nodeSleep, os } from "./node-runtime";
 import { GoogleAuth, DEFAULT_SCOPES } from "../src/google/auth";
 import { GoogleCalendarClient } from "../src/google/calendar";
 import { GoogleTasksClient } from "../src/google/tasks";
@@ -76,6 +76,7 @@ async function acquireLock(vaultPath: string): Promise<(() => Promise<void>) | n
 async function runSync(config: HeadlessConfig, args: Args): Promise<number> {
     const port = new NodeVaultPort(config.vaultPath);
     const baselines = new FileBaselineStore(config.vaultPath);
+    const retry = { sleep: nodeSleep };
     const auth = new GoogleAuth(
         nodeFetchHttp,
         () => ({
@@ -85,14 +86,16 @@ async function runSync(config: HeadlessConfig, args: Args): Promise<number> {
             scopes: DEFAULT_SCOPES,
         }),
         new FileTokenStore(config.tokenFile),
+        Date.now,
+        retry,
     );
     if (!(await auth.isConnected())) {
         log(`not authorized — run: authorize --config ${args.config}`);
         return 2;
     }
     const tokenProvider = () => auth.getAccessToken();
-    const calendar = new GoogleCalendarClient(nodeFetchHttp, tokenProvider);
-    const tasks = new GoogleTasksClient(nodeFetchHttp, tokenProvider);
+    const calendar = new GoogleCalendarClient(nodeFetchHttp, tokenProvider, retry);
+    const tasks = new GoogleTasksClient(nodeFetchHttp, tokenProvider, retry);
     const settings = () => config.settings;
     const router = new SyncRouter(port, calendar, tasks, settings, baselines, log);
     const importer = new GoogleImporter(port, calendar, tasks, settings, () => {}, baselines);

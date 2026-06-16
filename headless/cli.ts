@@ -1,4 +1,4 @@
-import { existsSync, nodePath, os } from "./node-runtime";
+import { existsSync, nodePath, nodeSleep, os } from "./node-runtime";
 import { DEFAULT_SCOPES, GoogleAuth } from "../src/google/auth";
 import { GoogleCalendarClient, WriteEventOptions } from "../src/google/calendar";
 import { GoogleTasksClient } from "../src/google/tasks";
@@ -192,6 +192,7 @@ function taskBody(
 async function main(): Promise<void> {
     const { group, command, id, flags } = parseArgs(process.argv.slice(2));
     const config = await loadConfig(flags.config, { requireVault: false });
+    const retry = { sleep: nodeSleep };
     const auth = new GoogleAuth(
         nodeFetchHttp,
         () => ({
@@ -201,13 +202,15 @@ async function main(): Promise<void> {
             scopes: DEFAULT_SCOPES,
         }),
         new FileTokenStore(config.tokenFile),
+        Date.now,
+        retry,
     );
     if (!(await auth.isConnected())) {
         fail(`not authorized — run: authorize --config ${flags.config}`);
     }
     const tokenProvider = () => auth.getAccessToken();
-    const calendar = new GoogleCalendarClient(nodeFetchHttp, tokenProvider);
-    const tasks = new GoogleTasksClient(nodeFetchHttp, tokenProvider);
+    const calendar = new GoogleCalendarClient(nodeFetchHttp, tokenProvider, retry);
+    const tasks = new GoogleTasksClient(nodeFetchHttp, tokenProvider, retry);
     const calendarId = flags.calendar || config.settings.defaultCalendarId;
     const taskListId = flags.tasklist || config.settings.taskListId;
     const writeOpts: WriteEventOptions = flags.sendUpdates

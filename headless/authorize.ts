@@ -1,4 +1,4 @@
-import { http, setTimer, spawn } from "./node-runtime";
+import { http, nodeSleep, setTimer, spawn } from "./node-runtime";
 import { DEFAULT_SCOPES, GoogleAuth } from "../src/google/auth";
 import { nodeFetchHttp } from "./transport";
 import { FileTokenStore } from "./token-store";
@@ -96,6 +96,7 @@ async function main(): Promise<number> {
     }
 
     const redirectUri = `http://127.0.0.1:${config.loopbackPort}/callback`;
+    const retry = { sleep: nodeSleep };
     const auth = new GoogleAuth(
         nodeFetchHttp,
         () => ({
@@ -105,6 +106,8 @@ async function main(): Promise<number> {
             scopes: DEFAULT_SCOPES,
         }),
         store,
+        Date.now,
+        retry,
     );
     const { url } = await auth.beginAuth();
 

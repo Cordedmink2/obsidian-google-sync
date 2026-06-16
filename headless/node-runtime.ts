@@ -125,6 +125,12 @@ export const setTimer = (callback: () => void, ms: number): TimerHandle =>
         throw new Error("timer API unavailable");
     })();
 
+export function nodeSleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimer(resolve, ms);
+    });
+}
+
 export function execFileAsync(
     file: string,
     args: string[],
