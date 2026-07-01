@@ -180,7 +180,7 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
                             await load();
                             this.display();
                         } catch (e) {
-                            new Notice(`google-sync: ${(e as Error).message}`);
+                            new Notice(`Google sync: ${(e as Error).message}`);
                         }
                     }),
             );
@@ -197,7 +197,7 @@ export class GoogleSyncSettingTab extends PluginSettingTab {
                         await load();
                         this.display();
                     } catch (e) {
-                        new Notice(`google-sync: ${(e as Error).message}`);
+                        new Notice(`Google sync: ${(e as Error).message}`);
                     }
                 }),
             );

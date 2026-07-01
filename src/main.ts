@@ -221,7 +221,9 @@ export default class GoogleSyncPlugin extends Plugin {
      */
     prepareConnect(): void {
         if (!this.settings.clientId || !this.settings.redirectUri) return;
-        void this.auth.prepare();
+        this.auth.prepare().catch((e: unknown) => {
+            console.error("[google-sync] auth prepare failed", e);
+        });
     }
 
     async connect(): Promise<void> {
@@ -323,11 +325,7 @@ export default class GoogleSyncPlugin extends Plugin {
                 method: "GET",
                 headers: {},
             });
-            const { ok, message } = checkBridgeResponse(
-                res.status,
-                (res.text ?? "").toString(),
-            );
-            if (ok) return message;
+            const { message } = checkBridgeResponse(res.status, (res.text ?? "").toString());
             return message;
         } catch (e) {
             return `Could not reach the bridge URL: ${(e as Error).message}. Check that the URL is correct and the page is publicly accessible.`;
@@ -344,11 +342,11 @@ export default class GoogleSyncPlugin extends Plugin {
             if (blocked.length) return; // the router already explained the guard
             new Notice(
                 failed > 0
-                    ? `google-sync: pushed ${synced} update(s), ${failed} failed (see console).`
-                    : `google-sync: pushed ${synced} update(s).`,
+                    ? `Google sync: pushed ${synced} update(s), ${failed} failed (see console).`
+                    : `Google sync: pushed ${synced} update(s).`,
             );
         } catch (e) {
-            new Notice(`google-sync error: ${(e as Error).message}`);
+            new Notice(`Google sync error: ${(e as Error).message}`);
         }
     }
 
@@ -374,7 +372,7 @@ export default class GoogleSyncPlugin extends Plugin {
                 8000,
             );
         } catch (e) {
-            new Notice(`google-sync error: ${(e as Error).message}`);
+            new Notice(`Google sync error: ${(e as Error).message}`);
         }
     }
 
@@ -396,11 +394,11 @@ export default class GoogleSyncPlugin extends Plugin {
                 orphaned > 0 ? ` ${orphaned} note(s) filed to orphaned/ (deleted in Google).` : "";
             new Notice(
                 failed > 0
-                    ? `google-sync: imported ${events} event(s), ${tasks} task(s), ${failed} failed.${orphanSuffix}${lifecycleSuffix}`
-                    : `google-sync: imported ${events} event(s) and ${tasks} task(s).${orphanSuffix}${lifecycleSuffix}`,
+                    ? `Google sync: imported ${events} event(s), ${tasks} task(s), ${failed} failed.${orphanSuffix}${lifecycleSuffix}`
+                    : `Google sync: imported ${events} event(s) and ${tasks} task(s).${orphanSuffix}${lifecycleSuffix}`,
             );
         } catch (e) {
-            new Notice(`google-sync import error: ${(e as Error).message}`);
+            new Notice(`Google sync import error: ${(e as Error).message}`);
         }
     }
 
@@ -475,11 +473,11 @@ export default class GoogleSyncPlugin extends Plugin {
             const total = c.archived + c.overdue + c.completed;
             if (manual || total > 0) {
                 new Notice(
-                    `google-sync lifecycle: ${c.archived} archived, ${c.overdue} overdue, ${c.completed} completed.`,
+                    `Google sync lifecycle: ${c.archived} archived, ${c.overdue} overdue, ${c.completed} completed.`,
                 );
             }
         } catch (e) {
-            new Notice(`google-sync lifecycle error: ${(e as Error).message}`);
+            new Notice(`Google sync lifecycle error: ${(e as Error).message}`);
         }
     }
 
@@ -565,7 +563,7 @@ export default class GoogleSyncPlugin extends Plugin {
             await this.router.syncPath(file.path);
             await this.maybeFileCompletedTask(file);
         } catch (e) {
-            new Notice(`google-sync: ${(e as Error).message}`);
+            new Notice(`Google sync: ${(e as Error).message}`);
         }
     }
 
@@ -588,7 +586,7 @@ export default class GoogleSyncPlugin extends Plugin {
         try {
             await this.router.syncPath(file.path);
         } catch (e) {
-            new Notice(`google-sync: ${(e as Error).message}`);
+            new Notice(`Google sync: ${(e as Error).message}`);
         }
     }
 }

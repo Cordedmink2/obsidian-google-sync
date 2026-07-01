@@ -80,6 +80,33 @@ describe("NodeVaultPort", () => {
         expect(typeof fm.due).to.equal("string");
     });
 
+    it("reads frontmatter from a note with CRLF line endings", async () => {
+        await fs.mkdir(nodePath.join(dir, "tasks"), { recursive: true });
+        await fs.writeFile(
+            nodePath.join(dir, "tasks", "crlf.md"),
+            "---\r\ntitle: Windows note\r\ncompleted: false\r\n---\r\n\r\nbody line\r\n",
+        );
+        const fm = await port.readFrontmatter("tasks/crlf.md");
+        expect(fm.title).to.equal("Windows note");
+        expect(fm.completed).to.equal(false);
+    });
+
+    it("rewrites CRLF frontmatter without duplicating the block or losing the body", async () => {
+        await fs.mkdir(nodePath.join(dir, "tasks"), { recursive: true });
+        await fs.writeFile(
+            nodePath.join(dir, "tasks", "crlf.md"),
+            "---\r\ntitle: Old\r\n---\r\n\r\nkeep me\r\n",
+        );
+        await port.writeFrontmatter("tasks/crlf.md", { title: "New", completed: true });
+        const content = await fs.readFile(nodePath.join(dir, "tasks", "crlf.md"), "utf8");
+        expect(content).to.contain("keep me");
+        expect(content.match(/^---/gm)?.length).to.equal(2); // one block, not a prepended second one
+        expect(await port.readFrontmatter("tasks/crlf.md")).to.deep.equal({
+            title: "New",
+            completed: true,
+        });
+    });
+
     it("refuses paths that escape the vault", async () => {
         let err: unknown;
         try {
