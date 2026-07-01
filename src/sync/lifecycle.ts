@@ -73,7 +73,7 @@ export class Lifecycle {
                     await this.tasks.patchTask(s.taskListId, gid, { status: "completed" });
                 } catch (e) {
                     this.notify(
-                        `google-sync: could not close task ${basename}: ${(e as Error).message}`,
+                        `Google sync: could not close task ${basename}: ${(e as Error).message}`,
                     );
                 }
             }
