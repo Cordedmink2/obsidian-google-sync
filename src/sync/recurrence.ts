@@ -21,13 +21,22 @@ export function isRecurringEvent(event: GoogleEvent): boolean {
     return Array.isArray(event.recurrence) && event.recurrence.length > 0;
 }
 
+/** Compiled patterns, cached — an import calls the filter once per expanded occurrence. */
+const compiledPatterns = new Map<string, RegExp>();
+
 /** Compile a user pattern to an anchored, case-insensitive matcher where `*` is a wildcard. */
 function patternToRegExp(pattern: string): RegExp {
+    const cached = compiledPatterns.get(pattern);
+    if (cached) return cached;
+    // The settings list stays small; the bound just guards against unbounded growth.
+    if (compiledPatterns.size > 200) compiledPatterns.clear();
     const body = pattern
         .trim()
         .replace(/[.+?^${}()|[\]\\]/g, "\\$&") // escape regex metachars (but not `*`)
         .replace(/\*/g, ".*"); // `*` becomes a wildcard
-    return new RegExp(`^${body}$`, "i");
+    const re = new RegExp(`^${body}$`, "i");
+    compiledPatterns.set(pattern, re);
+    return re;
 }
 
 /**

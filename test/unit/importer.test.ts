@@ -97,6 +97,21 @@ describe("GoogleImporter (port-based)", () => {
         expect(vault.fm("tasks/buy-milk.md")?.title).to.equal("edited locally");
     });
 
+    it("upserts a googleId seen twice in one run into a single note", async () => {
+        const vault = new MemoryVault();
+        // e.g. the same event returned by two calendar listings in one import.
+        const occurrence = {
+            id: "ev1",
+            summary: "Dentist",
+            start: { dateTime: "2026-06-02T09:00:00+12:00" },
+        };
+        const importer = makeImporter(vault, [occurrence, { ...occurrence }], []);
+
+        await importer.importAll();
+
+        expect(vault.paths().filter((p) => p.startsWith("events/"))).to.have.length(1);
+    });
+
     it("avoids path collisions with a -2 suffix", async () => {
         const vault = new MemoryVault();
         // Same slug as the incoming event, but a different googleId.

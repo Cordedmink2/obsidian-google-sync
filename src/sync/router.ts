@@ -88,7 +88,7 @@ export class SyncRouter {
         this.recentPatches = this.recentPatches.filter((t) => t > cutoff);
         if (this.recentPatches.length >= max) {
             this.notify(
-                `google-sync: mass-update guard — ${this.recentPatches.length} updates in the last minute; skipped ${noteName(path)}. Run "Push pending updates (confirmed)" to push everything.`,
+                `Google sync: mass-update guard — ${this.recentPatches.length} updates in the last minute; skipped ${noteName(path)}. Run "Push pending updates (confirmed)" to push everything.`,
             );
             return;
         }
@@ -104,20 +104,21 @@ export class SyncRouter {
     async syncAll(options: { confirmed?: boolean } = {}): Promise<SyncRunResult> {
         const result: SyncRunResult = { synced: 0, failed: 0, blocked: [] };
         const plans: PlannedPatch[] = [];
+        const parentIds = new Map<string, string | undefined>();
         for (const ref of await this.port.listMarkdown(this.scopeRoots())) {
             if (!this.syncKind(ref.path)) continue;
             try {
-                const plan = await this.planPath(ref.path);
+                const plan = await this.planPath(ref.path, { parentIds });
                 if (plan) plans.push(plan);
             } catch (e) {
                 result.failed++;
-                this.notify(`google-sync: ${noteName(ref.path)}: ${(e as Error).message}`);
+                this.notify(`Google sync: ${noteName(ref.path)}: ${(e as Error).message}`);
             }
         }
         if (!options.confirmed && plans.length > this.maxPatchesPerRun()) {
             result.blocked = plans.map((p) => p.path);
             this.notify(
-                `google-sync: mass-update guard — ${plans.length} notes have pending updates (limit ${this.maxPatchesPerRun()}). Nothing was sent. Run "Push pending updates (confirmed)" if this is intentional.`,
+                `Google sync: mass-update guard — ${plans.length} notes have pending updates (limit ${this.maxPatchesPerRun()}). Nothing was sent. Run "Push pending updates (confirmed)" if this is intentional.`,
             );
             return result;
         }
@@ -127,7 +128,7 @@ export class SyncRouter {
                 result.synced++;
             } catch (e) {
                 result.failed++;
-                this.notify(`google-sync: ${noteName(plan.path)}: ${(e as Error).message}`);
+                this.notify(`Google sync: ${noteName(plan.path)}: ${(e as Error).message}`);
             }
         }
         return result;
@@ -136,10 +137,11 @@ export class SyncRouter {
     /** Dry run: what would be pushed, per note, without calling Google's write endpoints. */
     async previewAll(): Promise<PendingChange[]> {
         const out: PendingChange[] = [];
+        const parentIds = new Map<string, string | undefined>();
         for (const ref of await this.port.listMarkdown(this.scopeRoots())) {
             if (!this.syncKind(ref.path)) continue;
             try {
-                const plan = await this.planPath(ref.path, { collectVetoed: out });
+                const plan = await this.planPath(ref.path, { collectVetoed: out, parentIds });
                 if (plan) out.push({ path: plan.path, changedKeys: Object.keys(plan.patch) });
             } catch (e) {
                 out.push({ path: ref.path, changedKeys: [], veto: (e as Error).message });
@@ -164,13 +166,20 @@ export class SyncRouter {
      */
     private async planPath(
         path: string,
-        options: { collectVetoed?: PendingChange[] } = {},
+        options: {
+            collectVetoed?: PendingChange[];
+            /** Per-run basename → googleId cache for parent resolution (see syncAll/previewAll). */
+            parentIds?: Map<string, string | undefined>;
+        } = {},
     ): Promise<PlannedPatch | null> {
         const kind = this.syncKind(path);
         if (!kind) return null;
         const fm = await this.port.readFrontmatter(path);
         if (isPullOnly(fm)) return null;
-        const plan = kind === "event" ? await this.planEvent(path, fm) : await this.planTask(path, fm);
+        const plan =
+            kind === "event"
+                ? await this.planEvent(path, fm)
+                : await this.planTask(path, fm, options.parentIds);
         if (!plan) return null;
         const baseline = (await this.baselines.get(path)) ?? (await this.fetchRemoteBaseline(plan));
         const patch = diffBody(baseline, plan.body);
@@ -188,7 +197,7 @@ export class SyncRouter {
         }
         const veto = vetPatch(patch, baseline, kind);
         if (!veto.ok) {
-            const msg = `google-sync: ${noteName(path)}: ${veto.reason} — not pushed. Re-import to restore the note from Google.`;
+            const msg = `Google sync: ${noteName(path)}: ${veto.reason} — not pushed. Re-import to restore the note from Google.`;
             options.collectVetoed?.push({ path, changedKeys: Object.keys(patch), veto: veto.reason });
             this.notify(msg);
             return null;
@@ -211,7 +220,7 @@ export class SyncRouter {
     ): Promise<PlannedPatch | null> {
         const v = validateEvent(fm);
         if (!v.ok || !v.value) {
-            this.notify(`google-sync: ${noteName(path)}: ${v.errors.join("; ")}`);
+            this.notify(`Google sync: ${noteName(path)}: ${v.errors.join("; ")}`);
             return null;
         }
         // One-way: notes without a googleId stay local until an import links them.
@@ -232,10 +241,11 @@ export class SyncRouter {
     private async planTask(
         path: string,
         fm: Record<string, unknown>,
+        parentIds?: Map<string, string | undefined>,
     ): Promise<PlannedPatch | null> {
         const v = validateTask(fm);
         if (!v.ok || !v.value) {
-            this.notify(`google-sync: ${noteName(path)}: ${v.errors.join("; ")}`);
+            this.notify(`Google sync: ${noteName(path)}: ${v.errors.join("; ")}`);
             return null;
         }
         // One-way: notes without a googleId stay local until an import links them.
@@ -243,13 +253,13 @@ export class SyncRouter {
         const s = this.settings();
         const taskListId = v.value.tasklist || s.taskListId;
         if (!taskListId) {
-            this.notify("google-sync: set a task list ID in settings before syncing tasks.");
+            this.notify("Google sync: set a task list ID in settings before syncing tasks.");
             return null;
         }
         const body = taskToGoogle(v.value, s.defaultTimezone) as GoogleBody;
         // `parent` participates in the diff (so re-nesting is detected) but is sent via
         // the move endpoint, not the PATCH body — see apply().
-        const parentId = await this.resolveParentGoogleId(v.value.parent);
+        const parentId = await this.resolveParentGoogleId(v.value.parent, parentIds);
         if (parentId) body.parent = parentId;
         return {
             path,
@@ -338,16 +348,27 @@ export class SyncRouter {
      * so it can be nested as a subtask. Returns undefined when there's no parent, the
      * link doesn't resolve to a task note, or the parent isn't linked to Google yet.
      */
-    private async resolveParentGoogleId(parent: unknown): Promise<string | undefined> {
+    private async resolveParentGoogleId(
+        parent: unknown,
+        cache?: Map<string, string | undefined>,
+    ): Promise<string | undefined> {
         if (typeof parent !== "string" || parent.trim() === "") return undefined;
         const target = linkToBasename(parent);
         if (!target) return undefined;
+        // Bulk runs (syncAll/previewAll) share a cache so the tasks folder is scanned at
+        // most once per distinct parent, not once per subtask.
+        if (cache?.has(target)) return cache.get(target);
+        let resolved: string | undefined;
         const s = this.settings();
         for (const ref of await this.port.listMarkdown([s.tasksFolder])) {
             if (ref.basename !== target) continue;
             const gid: unknown = (await this.port.readFrontmatter(ref.path)).googleId;
-            if (typeof gid === "string" && gid) return gid;
+            if (typeof gid === "string" && gid) {
+                resolved = gid;
+                break;
+            }
         }
-        return undefined;
+        cache?.set(target, resolved);
+        return resolved;
     }
 }

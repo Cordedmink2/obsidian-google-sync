@@ -53,17 +53,18 @@ async function pathFor(
     return unusedPath(port, basePathFor(folder, id, title, fallback));
 }
 
-async function findByGoogleId(
-    port: VaultPort,
-    folder: string,
-    googleId: string | undefined,
-): Promise<string | null> {
-    if (!googleId) return null;
+/**
+ * One folder scan up front builds the googleId → path index every upsert consults,
+ * instead of re-scanning the folder per imported item. First match wins (same as the
+ * old scan order); notes created during the run are added by the upserts.
+ */
+async function indexByGoogleId(port: VaultPort, folder: string): Promise<Map<string, string>> {
+    const index = new Map<string, string>();
     for (const ref of await port.listMarkdown([folder])) {
-        const fm = await port.readFrontmatter(ref.path);
-        if (fm.googleId === googleId) return ref.path;
+        const gid = (await port.readFrontmatter(ref.path)).googleId;
+        if (typeof gid === "string" && gid && !index.has(gid)) index.set(gid, ref.path);
     }
-    return null;
+    return index;
 }
 
 export class GoogleImporter {
@@ -127,6 +128,7 @@ export class GoogleImporter {
         window: { timeMin: string; timeMax: string },
     ): Promise<void> {
         const calendarIds = await this.calendarIds();
+        const index = await indexByGoogleId(this.port, this.settings().eventsFolder);
         for (const calendarId of calendarIds) {
             const { items } = await this.calendar.listEvents(calendarId, window);
             for (const event of items) {
@@ -136,7 +138,7 @@ export class GoogleImporter {
                     continue;
                 }
                 if (event.id) seen.eventIds.add(event.id);
-                await this.upsertEvent(calendarId, event, counts, options);
+                await this.upsertEvent(calendarId, event, counts, options, index);
             }
         }
     }
@@ -155,12 +157,13 @@ export class GoogleImporter {
         event: GoogleEvent,
         counts: ImportCounts,
         options: ImportOptions,
+        index: Map<string, string>,
     ): Promise<void> {
         try {
             const s = this.settings();
             if (!isEventAllowed(event, s.recurringEventFilterMode, s.recurringEventFilters)) return;
             const fm = remoteEventToNote(event, calendarId);
-            const existing = await findByGoogleId(this.port, s.eventsFolder, event.id);
+            const existing = event.id ? index.get(event.id) : undefined;
             if (existing) {
                 if (options.createOnly) return;
                 const merged = mergeManagedFrontmatter(
@@ -181,6 +184,7 @@ export class GoogleImporter {
                 );
                 await this.port.upsertMarkdown(path, fm);
                 this.onTouch(path);
+                if (event.id) index.set(event.id, path);
                 await this.baselines?.set(path, projectRemoteBody(event as GoogleBody, "event"));
             }
             counts.events++;
@@ -196,6 +200,7 @@ export class GoogleImporter {
         seen: SeenRemoteItems,
     ): Promise<void> {
         const taskListIds = await this.taskListIds();
+        const index = await indexByGoogleId(this.port, this.settings().tasksFolder);
         for (const taskListId of taskListIds) {
             const tasks = await this.tasks.listTasks(taskListId);
             // Google lists subtasks after their parent (position order), so a map of
@@ -210,6 +215,7 @@ export class GoogleImporter {
                     counts,
                     options,
                     parentBasename,
+                    index,
                 );
                 if (task.id && basename) basenameById.set(task.id, basename);
             }
@@ -231,11 +237,12 @@ export class GoogleImporter {
         task: GoogleTask,
         counts: ImportCounts,
         options: ImportOptions,
-        parentBasename?: string,
+        parentBasename: string | undefined,
+        index: Map<string, string>,
     ): Promise<string | undefined> {
         try {
             const fm = remoteTaskToNote(task, taskListId, parentBasename);
-            const existing = await findByGoogleId(this.port, this.settings().tasksFolder, task.id);
+            const existing = task.id ? index.get(task.id) : undefined;
             if (existing) {
                 if (options.createOnly) return basenameOf(existing);
                 const merged = mergeManagedFrontmatter(
@@ -258,6 +265,7 @@ export class GoogleImporter {
             );
             await this.port.upsertMarkdown(path, fm);
             this.onTouch(path);
+            if (task.id) index.set(task.id, path);
             await this.baselines?.set(path, projectRemoteBody(task as GoogleBody, "task"));
             counts.tasks++;
             return basenameOf(path);
