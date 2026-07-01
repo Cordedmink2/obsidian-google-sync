@@ -6,7 +6,7 @@ import { App, TFile, normalizePath, parseYaml, stringifyYaml } from "obsidian";
  * metadataCache timing right after a write.
  */
 
-const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---/;
+const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---/;
 
 export async function readFrontmatter(app: App, file: TFile): Promise<Record<string, unknown>> {
     const content = await app.vault.read(file);
@@ -35,7 +35,7 @@ export async function writeFrontmatter(
     frontmatter: Record<string, unknown>,
 ): Promise<void> {
     const content = await app.vault.read(file);
-    const body = content.replace(FRONTMATTER_RE, "").replace(/^\n+/, "");
+    const body = content.replace(FRONTMATTER_RE, "").replace(/^(\r?\n)+/, "");
     await app.vault.modify(file, `---\n${stringifyYaml(frontmatter)}---\n${body}`);
 }
 

@@ -3,7 +3,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { VaultNoteRef, VaultPort } from "../src/vault/port";
 import { basenameOf, normalizeVaultPath } from "../src/vault/paths";
 
-const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---/;
+const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---/;
 
 /** Directories that are never part of the synced note tree. */
 const OBSIDIAN_CONFIG_DIR = "." + "obsidian";
@@ -73,7 +73,7 @@ export class NodeVaultPort implements VaultPort {
         const parsed: unknown = parseYaml(block);
         return {
             fm: parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {},
-            body: content.replace(FRONTMATTER_RE, "").replace(/^\n+/, ""),
+            body: content.replace(FRONTMATTER_RE, "").replace(/^(\r?\n)+/, ""),
         };
     }
 
