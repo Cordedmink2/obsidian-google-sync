@@ -75,6 +75,38 @@ describe("eventToGoogle", () => {
         expect(ev.recurrence).to.equal(undefined);
     });
 
+    it("drops malformed entries from required/optional attendee lists", () => {
+        const ev = eventToGoogle(
+            {
+                title: "X",
+                date: "2026-06-02T09:00:00",
+                timezone: NZ,
+                attendees: {
+                    required: ["a@x.com", "", "   ", null, 7] as unknown as string[],
+                    optional: [undefined, "b@x.com"] as unknown as string[],
+                },
+            },
+            "UTC",
+        );
+        expect(ev.attendees).to.deep.equal([
+            { email: "a@x.com" },
+            { email: "b@x.com", optional: true },
+        ]);
+    });
+
+    it("omits attendees entirely when every list entry is malformed", () => {
+        const ev = eventToGoogle(
+            {
+                title: "X",
+                date: "2026-06-02T09:00:00",
+                timezone: NZ,
+                attendees: { required: ["", null] as unknown as string[] },
+            },
+            "UTC",
+        );
+        expect(ev.attendees).to.equal(undefined);
+    });
+
     it("maps transparency (free/busy)", () => {
         const ev = eventToGoogle(
             {

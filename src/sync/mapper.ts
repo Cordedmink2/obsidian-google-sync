@@ -33,9 +33,11 @@ function attendeesToGoogle(attendees: EventFrontmatter["attendees"]): GoogleEven
                 return out;
             });
     }
+    const isEmail = (e: unknown): e is string => typeof e === "string" && e.trim() !== "";
     const out: GoogleEventAttendee[] = [];
-    for (const email of attendees.required ?? []) out.push({ email });
-    for (const email of attendees.optional ?? []) out.push({ email, optional: true });
+    for (const email of attendees.required ?? []) if (isEmail(email)) out.push({ email });
+    for (const email of attendees.optional ?? [])
+        if (isEmail(email)) out.push({ email, optional: true });
     return out;
 }
 
