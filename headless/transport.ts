@@ -1,21 +1,19 @@
 import { HttpFn, parseJson } from "../src/google/http";
 
-/** Production transport for headless runs: Node's global HTTP client (Node >= 18). */
-
-const _mod: unknown = module;
-const _ModuleCtor = _mod as {
-    constructor: { _load: (name: string, parent: object, isMain: boolean) => unknown };
-};
-const _vm = _ModuleCtor.constructor._load("v" + "m", module, false) as {
-    runInThisContext: (code: string) => unknown;
-};
-const _g = _vm.runInThisContext("this") as Record<string, unknown>;
-const nodeHttpClient: typeof fetch = _g["fetc" + "h"] as typeof fetch;
-
+/**
+ * Production transport for headless runs: Node's global fetch (Node >= 18).
+ *
+ * This file is part of the Node-only headless tooling — it is never bundled into the
+ * plugin's main.js (enforced by scripts/check-runtime-bundle.mjs), so using fetch here
+ * is fine; the plugin itself uses Obsidian's requestUrl (src/google/transport.ts).
+ *
+ * `globalThis.fetch` is resolved at call time so a test preload
+ * (scripts/headless-mock-fetch.cjs) can swap it out before the first request.
+ */
 export const nodeFetchHttp: HttpFn = async (req) => {
     const headers: Record<string, string> = { ...(req.headers ?? {}) };
     if (req.contentType) headers["content-type"] = req.contentType;
-    const res = await nodeHttpClient(req.url, {
+    const res = await globalThis.fetch(req.url, {
         method: req.method ?? "GET",
         headers,
         body: req.body,

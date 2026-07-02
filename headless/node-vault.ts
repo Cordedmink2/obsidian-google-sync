@@ -1,4 +1,5 @@
-import { fs, nodePath } from "./node-runtime";
+import { promises as fs } from "node:fs";
+import * as nodePath from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { VaultNoteRef, VaultPort } from "../src/vault/port";
 import { basenameOf, normalizeVaultPath } from "../src/vault/paths";
@@ -6,8 +7,7 @@ import { basenameOf, normalizeVaultPath } from "../src/vault/paths";
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---/;
 
 /** Directories that are never part of the synced note tree. */
-const OBSIDIAN_CONFIG_DIR = "." + "obsidian";
-const SKIP_DIRS = new Set([OBSIDIAN_CONFIG_DIR, ".git", ".google-sync", ".trash"]);
+const SKIP_DIRS = new Set([".obsidian", ".git", ".google-sync", ".trash"]);
 
 /**
  * VaultPort over the plain filesystem, rooted at an Obsidian vault directory — lets the

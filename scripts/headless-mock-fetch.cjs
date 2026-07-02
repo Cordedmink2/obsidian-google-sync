@@ -34,13 +34,17 @@ globalThis.fetch = async (url, init = {}) => {
         return json({ error: { message: "Not Found" } }, 404);
     }
     if (method === "GET" && u.includes("/lists/") && u.includes("/tasks") && !u.match(/tasks\/[^?]+$/)) {
+        // Day-quantized future due date: stable within a day (idempotence assertions),
+        // never in the past (a past due would file the note to overdue/ mid-test).
+        const day = 24 * 3600_000;
+        const due = new Date(Math.floor(Date.now() / day) * day + 30 * day);
         return json({
             items: [
                 {
                     id: "smoke-task-1",
                     title: "Smoke task",
                     status: "needsAction",
-                    due: "2026-07-01T00:00:00.000Z",
+                    due: due.toISOString(),
                 },
             ],
         });

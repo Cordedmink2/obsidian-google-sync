@@ -1,4 +1,8 @@
-import { createHash, fs, nodePath, nodeSleep, os } from "./node-runtime";
+import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
+import * as os from "node:os";
+import * as nodePath from "node:path";
+import { setTimeout as nodeSleep } from "node:timers/promises";
 import { GoogleAuth, DEFAULT_SCOPES } from "../src/google/auth";
 import { GoogleCalendarClient } from "../src/google/calendar";
 import { GoogleTasksClient } from "../src/google/tasks";
@@ -61,16 +65,27 @@ async function acquireLock(vaultPath: string): Promise<(() => Promise<void>) | n
     // Lives in the OS temp dir (keyed by vault path) so it is never committed.
     const key = createHash("sha1").update(vaultPath).digest("hex").slice(0, 12);
     const lockFile = nodePath.join(os.tmpdir(), `gsync-${key}.lock`);
-    try {
-        const raw = await fs.readFile(lockFile, "utf8");
-        const { time } = JSON.parse(raw) as { time?: number };
+    const payload = () => JSON.stringify({ pid: process.pid, time: Date.now() });
+    // `wx` creates exclusively, so two runs starting together can't both win —
+    // a read-then-write check would let both pass before either wrote the lock.
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            await fs.writeFile(lockFile, payload(), { flag: "wx" });
+            return async () => fs.unlink(lockFile).catch(() => undefined);
+        } catch (e) {
+            if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+        }
+        let time: number | undefined;
+        try {
+            time = (JSON.parse(await fs.readFile(lockFile, "utf8")) as { time?: number }).time;
+        } catch {
+            // unreadable/corrupt lock — treat as stale
+        }
         if (time && Date.now() - time < LOCK_STALE_MS) return null;
         log("stale lock found — taking over");
-    } catch {
-        // no lock (or unreadable) — proceed
+        await fs.unlink(lockFile).catch(() => undefined);
     }
-    await fs.writeFile(lockFile, JSON.stringify({ pid: process.pid, time: Date.now() }));
-    return async () => fs.unlink(lockFile).catch(() => undefined);
+    return null;
 }
 
 async function runSync(config: HeadlessConfig, args: Args): Promise<number> {

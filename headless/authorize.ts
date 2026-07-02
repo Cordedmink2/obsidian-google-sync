@@ -1,4 +1,6 @@
-import { http, nodeSleep, setTimer, spawn } from "./node-runtime";
+import { spawn } from "node:child_process";
+import { createServer } from "node:http";
+import { setTimeout as nodeSleep } from "node:timers/promises";
 import { DEFAULT_SCOPES, GoogleAuth } from "../src/google/auth";
 import { nodeFetchHttp } from "./transport";
 import { FileTokenStore } from "./token-store";
@@ -21,15 +23,6 @@ import { loadConfig, readPluginData } from "./config";
 interface Args {
     config: string;
     fromPluginData?: string;
-}
-
-interface LoopbackRequest {
-    url?: string | null;
-}
-
-interface LoopbackResponse {
-    writeHead(status: number, headers?: Record<string, string>): LoopbackResponse;
-    end(body?: string): void;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -112,7 +105,7 @@ async function main(): Promise<number> {
     const { url } = await auth.beginAuth();
 
     const done = new Promise<number>((resolve) => {
-        const server = http.createServer((req: LoopbackRequest, res: LoopbackResponse) => {
+        const server = createServer((req, res) => {
             const reqUrl = new URL(req.url ?? "/", `http://127.0.0.1:${config.loopbackPort}`);
             if (reqUrl.pathname !== "/callback") {
                 res.writeHead(404).end();
@@ -160,7 +153,7 @@ async function main(): Promise<number> {
             tryOpenBrowser(url);
         });
         // Don't hang forever if the user walks away.
-        const timeout = setTimer(
+        const timeout = setTimeout(
             () => {
                 console.error("Timed out after 10 minutes.");
                 server.close(() => resolve(1));

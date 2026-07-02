@@ -1,5 +1,6 @@
 node_modules
 main.js
+dist
 .obsidian-cache
 package-lock.json
 *.map

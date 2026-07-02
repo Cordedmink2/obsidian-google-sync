@@ -1,4 +1,7 @@
-import { existsSync, nodePath, nodeSleep, os } from "./node-runtime";
+import { existsSync } from "node:fs";
+import * as os from "node:os";
+import * as nodePath from "node:path";
+import { setTimeout as nodeSleep } from "node:timers/promises";
 import { DEFAULT_SCOPES, GoogleAuth } from "../src/google/auth";
 import { GoogleCalendarClient, WriteEventOptions } from "../src/google/calendar";
 import { GoogleTasksClient } from "../src/google/tasks";

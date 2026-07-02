@@ -1,4 +1,5 @@
-import { fs, nodePath } from "./node-runtime";
+import { promises as fs } from "node:fs";
+import * as nodePath from "node:path";
 import { BaselineStore, GoogleBody } from "../src/sync/baseline";
 
 interface StateFile {
