@@ -1,3 +1,5 @@
+
+
 # Google Calendar and Tasks Sync
 
 Sync Google Calendar events and Google Tasks into an Obsidian vault, then push edits back to existing Google items.
@@ -78,7 +80,7 @@ Search for these commands in Obsidian's command palette:
 
 - **Connect to Google**
 - **Import events and tasks from Google**
-- **Sync now**
+- **Push updates to Google**
 - **Preview pending Google updates**
 - **Push pending updates (confirmed)**
 - **Run lifecycle scan**
