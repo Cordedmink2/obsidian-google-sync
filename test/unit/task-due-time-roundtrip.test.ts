@@ -13,13 +13,12 @@ describe("task due refinement", () => {
     const zone = "Pacific/Auckland";
 
     /** What Google echoes back for a given calendar date: always UTC midnight. */
-    function googleEcho(date: string, extra: Record<string, unknown> = {}) {
+    function googleEcho(date: string) {
         return {
             id: "t1",
             title: "Web 2",
             status: "needsAction" as const,
             due: `${date}T00:00:00.000Z`,
-            ...extra,
         };
     }
 
