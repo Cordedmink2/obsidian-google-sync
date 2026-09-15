@@ -1,5 +1,9 @@
-## Unreleased
+## 0.3.14
 
+- Added: a time of day on a task's `due` (`due: 2026-06-01T14:00`) is now kept. Previously
+  an import silently truncated it back to the date. Google Tasks stores a date only, so the
+  time stays in your vault and never reaches Google; if Google moves the date, the time
+  moves with it, and the task counts as overdue from that time rather than from midnight.
 - Fixed: lifecycle auto-close now completes a linked task in the task list the note was
   imported from, instead of always patching the default list (which 404'd for tasks from
   other lists).
