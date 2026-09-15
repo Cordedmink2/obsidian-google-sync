@@ -136,6 +136,8 @@ Local note body stays in Obsidian.
 
 The body of a task note is not synced. The `notes` frontmatter field maps to Google Tasks details.
 
+You can add a time to a task's `due` (`due: 2026-06-01T14:00`) and it will stay in your vault, including a task counting as overdue from that time rather than from midnight. Google Tasks cannot store it: its due date is a date only, so the time never reaches Google and an import can never bring one back. If Google moves the date, your time moves with it.
+
 ## Templater workflow
 
 Optional guide: [Templater setup](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/templater-setup.md)

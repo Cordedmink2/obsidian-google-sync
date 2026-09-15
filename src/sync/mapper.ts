@@ -220,6 +220,31 @@ export const TASK_MANAGED_KEYS = [
 ] as const;
 
 /**
+ * Carry a task's *refinement* — a time of day on `due` — across an import.
+ *
+ * `due` is a managed key, so Google normally overwrites it wholesale. A time is the one
+ * exception, and it is safe precisely because Google Tasks has no field to hold one: the
+ * Tasks API records the date and discards the time, so a time here is always the user's
+ * and Google can never contradict it. Google still owns the *date* — if it moves the
+ * deadline the new date wins, and the user's time rides along onto it. If Google clears
+ * `due` entirely there is nothing to refine and the time goes with it.
+ *
+ * See CONTEXT.md ("Refinement") and docs/adr/0001-google-owns-the-date-vault-owns-the-time.md.
+ */
+function withDueRefinement(
+    existing: Record<string, unknown>,
+    merged: Record<string, unknown>,
+): Record<string, unknown> {
+    const before = existing.due;
+    const after = merged.due;
+    if (typeof before !== "string" || typeof after !== "string") return merged;
+    // Google's date, plus whatever precision followed the user's own date.
+    const time = before.slice(10);
+    if (!time.startsWith("T")) return merged;
+    return { ...merged, due: after.slice(0, 10) + time };
+}
+
+/**
  * Merge Google-derived frontmatter onto an existing note. Managed keys come from
  * `incoming` (Google is the source of truth, including removals); any other key in
  * `existing` is kept, so a re-import no longer wipes user-added properties. Pure.
@@ -234,7 +259,8 @@ export function mergeManagedFrontmatter(
     for (const [k, v] of Object.entries(existing)) {
         if (!managed.includes(k)) preserved[k] = v;
     }
-    return { ...incoming, ...preserved };
+    const merged = { ...incoming, ...preserved };
+    return kind === "task" ? withDueRefinement(existing, merged) : merged;
 }
 
 /**
