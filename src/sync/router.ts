@@ -133,9 +133,6 @@ export class SyncRouter {
         }
         if (!options.confirmed && plans.length > this.maxPatchesPerRun()) {
             result.blocked = plans.map((p) => p.path);
-            this.notify(
-                `Google sync: mass-update guard — ${plans.length} notes have pending updates (limit ${this.maxPatchesPerRun()}). Nothing was sent. Run "Push pending updates (confirmed)" if this is intentional.`,
-            );
             return result;
         }
         for (const plan of plans) {
