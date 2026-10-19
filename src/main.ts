@@ -382,7 +382,7 @@ export default class GoogleSyncPlugin extends Plugin {
             return;
         }
         try {
-            const { events, tasks, failed, orphaned, lifecycleCounts } =
+            const { events, tasks, failed, orphaned, errors, lifecycleCounts } =
                 await this.runImportPipeline();
             const moved =
                 lifecycleCounts.archived + lifecycleCounts.overdue + lifecycleCounts.completed;
@@ -394,7 +394,7 @@ export default class GoogleSyncPlugin extends Plugin {
                 orphaned > 0 ? ` ${orphaned} note(s) filed to orphaned/ (deleted in Google).` : "";
             new Notice(
                 failed > 0
-                    ? `Google sync: imported ${events} event(s), ${tasks} task(s), ${failed} failed.${orphanSuffix}${lifecycleSuffix}`
+                    ? `Google sync: imported ${events} event(s), ${tasks} task(s), ${failed} failed${errors.length ? ` (${errors.join("; ")})` : ""}.${orphanSuffix}${lifecycleSuffix}`
                     : `Google sync: imported ${events} event(s) and ${tasks} task(s).${orphanSuffix}${lifecycleSuffix}`,
             );
         } catch (e) {
@@ -422,6 +422,7 @@ export default class GoogleSyncPlugin extends Plugin {
         tasks: number;
         failed: number;
         orphaned: number;
+        errors: string[];
         lifecycleCounts: Awaited<ReturnType<Lifecycle["runOnce"]>>;
     }> {
         if (this.importInFlight) {
@@ -431,6 +432,7 @@ export default class GoogleSyncPlugin extends Plugin {
                 tasks: 0,
                 failed: 0,
                 orphaned: 0,
+                errors: [],
                 lifecycleCounts: { archived: 0, overdue: 0, completed: 0 },
             };
         }
@@ -439,10 +441,11 @@ export default class GoogleSyncPlugin extends Plugin {
             tasks: number;
             failed: number;
             orphaned: number;
+            errors: string[];
             lifecycleCounts: Awaited<ReturnType<Lifecycle["runOnce"]>>;
         };
         this.importInFlight = (async () => {
-            const { events, tasks, failed, orphaned } = await this.importer.importAll({
+            const { events, tasks, failed, orphaned, errors } = await this.importer.importAll({
                 createOnly: options.createOnly,
             });
             const addedOrUpdated = events + tasks;
@@ -454,7 +457,7 @@ export default class GoogleSyncPlugin extends Plugin {
                 this.lastLifecycleRun = Date.now();
                 await this.saveAll();
             }
-            result = { events, tasks, failed, orphaned, lifecycleCounts };
+            result = { events, tasks, failed, orphaned, errors, lifecycleCounts };
         })();
         try {
             await this.importInFlight;

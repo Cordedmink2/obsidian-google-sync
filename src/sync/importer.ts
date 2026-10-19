@@ -16,6 +16,8 @@ export interface ImportCounts {
     failed: number;
     /** Notes whose Google item was confirmed deleted, filed into orphaned/. */
     orphaned: number;
+    /** Why each failed phase failed, in plain words, for the user-facing notice. */
+    errors: string[];
 }
 
 export interface ImportOptions {
@@ -82,7 +84,7 @@ export class GoogleImporter {
     ) {}
 
     async importAll(options: ImportOptions = {}): Promise<ImportCounts> {
-        const counts: ImportCounts = { events: 0, tasks: 0, failed: 0, orphaned: 0 };
+        const counts: ImportCounts = { events: 0, tasks: 0, failed: 0, orphaned: 0, errors: [] };
         const window = this.eventWindow();
         const seen = emptySeen(window.timeMin, window.timeMax);
         // Events and tasks are imported independently: a failure in one phase must not
@@ -92,6 +94,7 @@ export class GoogleImporter {
             seen.eventsComplete = true;
         } catch (e) {
             counts.failed++;
+            counts.errors.push(`events: ${(e as Error).message}`);
             console.error("[google-sync] event import failed", e);
         }
         try {
@@ -99,6 +102,7 @@ export class GoogleImporter {
             seen.tasksComplete = true;
         } catch (e) {
             counts.failed++;
+            counts.errors.push(`tasks: ${(e as Error).message}`);
             console.error("[google-sync] task import failed", e);
         }
         // Startup (createOnly) imports stay additions-only; full imports also file notes

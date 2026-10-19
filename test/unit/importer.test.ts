@@ -144,3 +144,48 @@ describe("GoogleImporter (port-based)", () => {
         expect(vault.fm(childPath ?? "")?.parent).to.equal("[[parent-task-p1]]");
     });
 });
+
+describe("GoogleImporter failure reporting", () => {
+    function failingImporter(status: number) {
+        const vault = new MemoryVault();
+        const settings: GoogleSyncSettings = { ...DEFAULT_SETTINGS, taskListId: "L1" };
+        const http: HttpFn = async (req: HttpRequest) => {
+            if (req.url.includes("/calendars/")) {
+                const body = { error: { message: `boom ${status}` } };
+                return { status, headers: {}, text: JSON.stringify(body), json: body };
+            }
+            const body = { items: [{ id: "t1", title: "Survivor" }] };
+            return { status: 200, headers: {}, text: JSON.stringify(body), json: body };
+        };
+        const importer = new GoogleImporter(
+            vault,
+            new GoogleCalendarClient(http, token, noWaitRetry),
+            new GoogleTasksClient(http, token, noWaitRetry),
+            () => settings,
+        );
+        return { vault, importer };
+    }
+
+    it("reports why a phase failed, and still imports the other phase", async () => {
+        const { vault, importer } = failingImporter(403);
+        const counts = await importer.importAll();
+        expect(counts.failed).to.equal(1);
+        expect(counts.errors).to.have.length(1);
+        expect(counts.errors[0]).to.match(/events/i);
+        expect(counts.errors[0]).to.match(/403/);
+        expect(vault.paths().some((p) => p.startsWith("tasks/"))).to.equal(true);
+    });
+
+    it("has no errors when everything imports", async () => {
+        const vault = new MemoryVault();
+        const settings: GoogleSyncSettings = { ...DEFAULT_SETTINGS, taskListId: "L1" };
+        const http = googleStub([], []);
+        const importer = new GoogleImporter(
+            vault,
+            new GoogleCalendarClient(http, token, noWaitRetry),
+            new GoogleTasksClient(http, token, noWaitRetry),
+            () => settings,
+        );
+        expect((await importer.importAll()).errors).to.deep.equal([]);
+    });
+});
