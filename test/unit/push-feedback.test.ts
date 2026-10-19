@@ -1,6 +1,12 @@
 import { describe, it } from "mocha";
 import { expect } from "chai";
-import { NOTHING_TO_PUSH, formatPendingLines, formatPushNotice } from "../../src/sync/push-report";
+import {
+    NOTHING_TO_PUSH,
+    formatImportNotice,
+    formatPendingLines,
+    formatPushNotice,
+    pendingHeading,
+} from "../../src/sync/push-report";
 import { SyncRouter, SyncRunResult } from "../../src/sync/router";
 import { GoogleCalendarClient } from "../../src/google/calendar";
 import { GoogleTasksClient } from "../../src/google/tasks";
@@ -13,6 +19,7 @@ const empty = (over: Partial<SyncRunResult> = {}): SyncRunResult => ({
     synced: 0,
     failed: 0,
     blocked: [],
+    failures: [],
     limit: 10,
     skipped: { pullOnly: 0, unlinked: 0 },
     ...over,
@@ -47,12 +54,35 @@ describe("push feedback wording (D5)", () => {
         expect(msg).to.contain("Push pending updates (confirmed)");
         expect(msg).to.contain("2 failed");
         expect(msg).to.not.contain("console");
+        expect(msg).to.not.contain("notice above");
     });
 
-    it("explains skips even when nothing at all was pushed", () => {
+    it("explains skips when nothing was pushed, without claiming everything is up to date", () => {
         const msg = formatPushNotice(empty({ skipped: { pullOnly: 0, unlinked: 3 } }));
         expect(msg).to.contain("nothing to push");
+        expect(msg).to.not.contain("up to date");
         expect(msg).to.contain("3 not linked to Google (no googleId)");
+    });
+
+    it("puts each failure reason in the notice itself", () => {
+        const msg = formatPushNotice(
+            empty({ failed: 2, failures: ["a.md: Google rejected the sign-in (401).", "b.md: x"] }),
+        );
+        expect(msg).to.contain("a.md: Google rejected the sign-in (401).");
+        expect(msg).to.contain("b.md: x");
+    });
+
+    it("pluralises the preview heading", () => {
+        expect(pendingHeading(1)).to.equal("1 note would be pushed.");
+        expect(pendingHeading(3)).to.equal("3 notes would be pushed.");
+    });
+
+    it("says plainly that an empty Google had nothing to import", () => {
+        expect(
+            formatImportNotice({ events: 0, tasks: 0, failed: 0, orphaned: 0, errors: [] }, ""),
+        ).to.equal(
+            "Google sync: nothing to import — no events or tasks found in your import window.",
+        );
     });
 
     it("a guard-blocked run never claims everything is up to date", () => {
@@ -68,9 +98,9 @@ describe("push feedback wording (D5)", () => {
             { path: "events/c.md", changedKeys: [] },
         ]);
         expect(lines).to.deep.equal([
-            { path: "events/a.md", detail: "summary, start", blocked: false },
+            { path: "events/a.md", detail: "changes: summary, start", blocked: false },
             { path: "tasks/b.md", detail: "BLOCKED: title looks like a template", blocked: true },
-            { path: "events/c.md", detail: "Meet link request", blocked: false },
+            { path: "events/c.md", detail: "changes: Meet link request", blocked: false },
         ]);
     });
 });

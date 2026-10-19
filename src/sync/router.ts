@@ -1,6 +1,7 @@
 import { GoogleSyncSettings } from "../settings-data";
 import { GoogleCalendarClient, WriteEventOptions } from "../google/calendar";
 import { GoogleTasksClient } from "../google/tasks";
+import { describeGoogleError } from "../google/friendly-errors";
 import { detectKind, isManagedSubpath, validateEvent, validateTask } from "./frontmatter";
 import { eventToGoogle, taskToGoogle } from "./mapper";
 import { linkToBasename } from "./lifecycle-plan";
@@ -43,6 +44,8 @@ export interface SyncRunResult {
     blocked: string[];
     /** The mass-update limit in force, for the notice. */
     limit: number;
+    /** One plain-language reason per failed note, so the push notice can carry it. */
+    failures: string[];
     /** In-scope notes left alone because they cannot be pushed (counted, never silent). */
     skipped: SkipCounts;
 }
@@ -117,6 +120,7 @@ export class SyncRouter {
             failed: 0,
             blocked: [],
             limit: this.maxPatchesPerRun(),
+            failures: [],
             skipped: skips,
         };
         const plans: PlannedPatch[] = [];
@@ -128,7 +132,7 @@ export class SyncRouter {
                 if (plan) plans.push(plan);
             } catch (e) {
                 result.failed++;
-                this.notify(`Google sync: ${noteName(ref.path)}: ${(e as Error).message}`);
+                result.failures.push(`${noteName(ref.path)}: ${describeGoogleError(e)}`);
             }
         }
         if (!options.confirmed && plans.length > this.maxPatchesPerRun()) {
@@ -141,7 +145,7 @@ export class SyncRouter {
                 result.synced++;
             } catch (e) {
                 result.failed++;
-                this.notify(`Google sync: ${noteName(plan.path)}: ${(e as Error).message}`);
+                result.failures.push(`${noteName(plan.path)}: ${describeGoogleError(e)}`);
             }
         }
         return result;

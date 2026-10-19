@@ -1,3 +1,4 @@
+import { describeGoogleError } from "../google/friendly-errors";
 import { GoogleCalendarClient } from "../google/calendar";
 import { GoogleTasksClient } from "../google/tasks";
 import { DEFAULT_SETTINGS, GoogleSyncSettings } from "../settings-data";
@@ -94,7 +95,7 @@ export class GoogleImporter {
             seen.eventsComplete = true;
         } catch (e) {
             counts.failed++;
-            counts.errors.push(`events: ${(e as Error).message}`);
+            counts.errors.push(`events: ${describeGoogleError(e)}`);
             console.error("[google-sync] event import failed", e);
         }
         try {
@@ -102,7 +103,7 @@ export class GoogleImporter {
             seen.tasksComplete = true;
         } catch (e) {
             counts.failed++;
-            counts.errors.push(`tasks: ${(e as Error).message}`);
+            counts.errors.push(`tasks: ${describeGoogleError(e)}`);
             console.error("[google-sync] task import failed", e);
         }
         // Startup (createOnly) imports stay additions-only; full imports also file notes

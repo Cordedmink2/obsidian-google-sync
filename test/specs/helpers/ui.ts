@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/await-thenable -- wdio element chainables are awaited on purpose */
 import { browser } from "@wdio/globals";
 import * as fs from "fs";
 import * as path from "path";
@@ -15,9 +16,9 @@ let shotPlatform = "desktop";
 
 export async function startShots(firstIndex = 0): Promise<void> {
     shotIndex = firstIndex;
-    shotPlatform = (await browser.execute(() =>
+    shotPlatform = await browser.execute(() =>
         document.body.classList.contains("is-mobile") ? "mobile" : "desktop",
-    )) as string;
+    );
     fs.mkdirSync(path.join(SHOT_ROOT, shotPlatform), { recursive: true });
     mainHandle = await browser.getWindowHandle();
     await browser.executeObsidian(() => window.focus());
@@ -69,7 +70,7 @@ export async function runCommand(name: string, opts: { shotName?: string } = {})
             const first = await browser.execute(
                 () => document.querySelector(".suggestion-item.is-selected")?.textContent ?? "",
             );
-            return (first as string).includes(name);
+            return first.includes(name);
         },
         { timeout: 5000, timeoutMsg: `palette never selected "${name}"` },
     );
@@ -95,9 +96,9 @@ export async function notices(): Promise<string[]> {
     for (const h of await handles()) {
         await browser.switchToWindow(h);
         out.push(
-            ...((await browser.execute(() =>
+            ...(await browser.execute(() =>
                 Array.from(document.querySelectorAll(".notice")).map((n) => n.textContent ?? ""),
-            )) as string[]),
+            )),
         );
     }
     await browser.switchToWindow(current);
@@ -118,6 +119,8 @@ export async function waitForNotice(text: string, timeout = 15000): Promise<stri
             timeoutMsg: `no notice containing "${text}"; saw: ${JSON.stringify(await notices())}`,
         },
     );
+    // Obsidian slides notices in; let the animation finish so screenshots show the full text.
+    await browser.pause(700);
     return found;
 }
 
@@ -144,9 +147,7 @@ export async function openSettings(): Promise<void> {
     await runCommand("Open settings");
     await browser.pause(700);
     const before = (await handles()).length;
-    const inline = (await browser.execute(
-        () => !!document.querySelector(".modal.mod-settings"),
-    )) as boolean;
+    const inline = await browser.execute(() => !!document.querySelector(".modal.mod-settings"));
     if (!inline && before === 1) {
         await browser.executeObsidian(({ app }) => {
             window.focus();
@@ -181,11 +182,11 @@ export async function openSettings(): Promise<void> {
     }
     await browser.waitUntil(
         async () =>
-            (await browser.execute(() =>
+            await browser.execute(() =>
                 Array.from(document.querySelectorAll(".setting-item-name")).some(
                     (n) => n.textContent?.trim() === "OAuth client ID",
                 ),
-            )) as boolean,
+            ),
         { timeout: 8000, timeoutMsg: "plugin settings tab did not render" },
     );
     await browser.pause(300);
@@ -303,35 +304,37 @@ export async function clickToggle(settingName: string): Promise<void> {
 }
 
 export async function isToggleOn(settingName: string): Promise<boolean> {
-    return (await browser.execute((x: string) => {
+    return await browser.execute((x: string) => {
         const row = document.evaluate(x, document, null, 9, null)
             .singleNodeValue as HTMLElement | null;
         return !!row?.querySelector(".checkbox-container.is-enabled");
-    }, rowXpath(settingName))) as boolean;
+    }, rowXpath(settingName));
 }
 
 export async function settingValue(settingName: string): Promise<string> {
-    return (await browser.execute((x: string) => {
+    return await browser.execute((x: string) => {
         const row = document.evaluate(x, document, null, 9, null)
             .singleNodeValue as HTMLElement | null;
         const el = row?.querySelector(
             "input:not([type=checkbox]), select, textarea",
         ) as HTMLInputElement | null;
         return el?.value ?? "";
-    }, rowXpath(settingName))) as string;
+    }, rowXpath(settingName));
 }
 
 /** Text of the open preview modal (empty when none). */
 export async function modalText(): Promise<string> {
-    return (await browser.execute(
+    return await browser.execute(
         () => document.querySelector(".modal-container .modal")?.textContent ?? "",
-    )) as string;
+    );
 }
 
 /** Read the plugin's saved data.json (what a reload would see). */
 export async function readSavedSettings(): Promise<Record<string, unknown>> {
     return browser.executeObsidian(async ({ app }) => {
-        const raw = await app.vault.adapter.read(".obsidian/plugins/google-sync/data.json");
+        const raw = await app.vault.adapter.read(
+            `${app.vault.configDir}/plugins/google-sync/data.json`,
+        );
         return JSON.parse(raw) as Record<string, unknown>;
     });
 }

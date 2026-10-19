@@ -60,8 +60,8 @@ describe("click-through: empty, error and persistence states", function () {
     it("empty Google: Import, Push and Preview say so plainly", async () => {
         await clearNotices();
         await runCommand("Import events and tasks from Google");
-        const n = await waitForNotice("imported");
-        expect(n).to.contain("imported 0 event(s) and 0 task(s)");
+        const n = await waitForNotice("nothing to import");
+        expect(n).to.contain("nothing to import");
         await shot("empty-import");
 
         await clearNotices();
@@ -85,28 +85,32 @@ describe("click-through: empty, error and persistence states", function () {
         await clearNotices();
         await runCommand("Test connection");
         const t = await waitForNotice("Connection failed");
-        expect(t).to.match(/401|auth|sign|expired|permission/i);
+        expect(t).to.contain("Connect to Google");
+        expect(t).to.not.match(/https?:|GET /);
         await shot("401-test-connection");
 
         await clearNotices();
         await runCommand("Import events and tasks from Google");
         const i = await waitForNotice("Google sync");
-        expect(i).to.match(/401|auth|sign|expired|permission|failed|error/i);
+        expect(i).to.contain("Connect to Google");
+        expect(i).to.not.match(/https?:|GET /);
         await shot("401-import");
 
         await clearNotices();
         await runCommand("Push updates to Google");
-        const p = await waitForNotice("pushed 0 update(s)");
+        const p = await waitForNotice("Not pushed");
         const all = (await notices()).join(" || ");
         expect(all, all).to.not.contain("up to date");
         expect(p).to.contain("1 failed");
-        expect(all).to.match(/401/);
+        expect(p).to.contain("Connect to Google");
+        expect(all).to.not.match(/https?:|GET /);
         await shot("401-push");
 
         await clearNotices();
         await runCommand("Validate setup");
         const v = await waitForNotice("calendar");
         expect(v).to.contain("[--]");
+        expect(v).to.not.match(/https?:|GET /);
         await shot("401-validate-setup");
     });
 
@@ -115,21 +119,25 @@ describe("click-through: empty, error and persistence states", function () {
         await clearNotices();
         await runCommand("Test connection");
         const t = await waitForNotice("Connection failed", 40000);
-        expect(t).to.match(/503|unavailable|server|try again/i);
+        expect(t).to.match(/temporarily unavailable \(503\)/);
+        expect(t).to.not.match(/https?:|GET /);
         await shot("5xx-test-connection");
 
         await clearNotices();
         await runCommand("Import events and tasks from Google");
         const i = await waitForNotice("Google sync", 40000);
-        expect(i).to.not.match(/imported 0 event\(s\) and 0 task\(s\)\.$/);
+        expect(i).to.not.contain("nothing to import");
+        expect(i).to.contain("failed");
+        expect(i).to.not.match(/https?:|GET /);
         await shot("5xx-import");
 
         await clearNotices();
         await runCommand("Push updates to Google");
-        await waitForNotice("pushed 0 update(s)", 40000);
+        await waitForNotice("Not pushed", 40000);
         const all = (await notices()).join(" || ");
         expect(all, all).to.not.contain("up to date");
-        expect(all).to.match(/503/);
+        expect(all).to.match(/temporarily unavailable \(503\)/);
+        expect(all).to.not.match(/https?:|GET /);
         await shot("5xx-push");
     });
 

@@ -19,7 +19,8 @@ import {
     checkBridgeResponse,
     formatCheck,
 } from "./setup-checks";
-import { formatPendingLines, formatPushNotice } from "./sync/push-report";
+import { formatImportNotice, formatPendingLines, formatPushNotice } from "./sync/push-report";
+import { describeGoogleError } from "./google/friendly-errors";
 import { PendingUpdatesModal } from "./pending-modal";
 
 interface PersistedData {
@@ -281,7 +282,7 @@ export default class GoogleSyncPlugin extends Plugin {
     async validateSetup(): Promise<string> {
         const s = this.settings;
         const lines: string[] = checkCredentialFields(s).map(formatCheck);
-        lines.push(OWN_CLIENT_NOTE);
+        lines.push(`Note: ${OWN_CLIENT_NOTE}`);
         const mark = (ok: boolean, label: string) => lines.push(`${ok ? "[ok]" : "[--]"} ${label}`);
 
         const connected = await this.auth.isConnected();
@@ -298,7 +299,7 @@ export default class GoogleSyncPlugin extends Plugin {
                     cals.some((c) => c.id === s.defaultCalendarId);
                 mark(found, `calendar "${s.defaultCalendarId}" among ${cals.length} found`);
             } catch (e) {
-                mark(false, `calendar check failed: ${(e as Error).message}`);
+                mark(false, `calendar check failed: ${describeGoogleError(e)}`);
             }
             try {
                 const lists = await this.tasks.listTaskLists();
@@ -306,7 +307,7 @@ export default class GoogleSyncPlugin extends Plugin {
                     s.taskListId === "@default" || lists.some((l) => l.id === s.taskListId);
                 mark(found, `task list "${s.taskListId}" among ${lists.length} found`);
             } catch (e) {
-                mark(false, `task list check failed: ${(e as Error).message}`);
+                mark(false, `task list check failed: ${describeGoogleError(e)}`);
             }
         }
         return lines.join("\n");
@@ -318,7 +319,7 @@ export default class GoogleSyncPlugin extends Plugin {
             const cals = await this.calendar.listCalendars();
             return `Connection OK — ${cals.length} calendar(s) visible.`;
         } catch (e) {
-            return `Connection failed: ${(e as Error).message}`;
+            return `Connection failed: ${describeGoogleError(e)}`;
         }
     }
 
@@ -349,7 +350,7 @@ export default class GoogleSyncPlugin extends Plugin {
             const result = await this.router.syncAll({ confirmed });
             new Notice(formatPushNotice(result), 10000);
         } catch (e) {
-            new Notice(`Google sync error: ${(e as Error).message}`);
+            new Notice(`Google sync error: ${describeGoogleError(e)}`);
         }
     }
 
@@ -367,7 +368,7 @@ export default class GoogleSyncPlugin extends Plugin {
             }
             new PendingUpdatesModal(this.app, formatPendingLines(pending)).open();
         } catch (e) {
-            new Notice(`Google sync error: ${(e as Error).message}`);
+            new Notice(`Google sync error: ${describeGoogleError(e)}`);
         }
     }
 
@@ -388,12 +389,14 @@ export default class GoogleSyncPlugin extends Plugin {
             const orphanSuffix =
                 orphaned > 0 ? ` ${orphaned} note(s) filed to orphaned/ (deleted in Google).` : "";
             new Notice(
-                failed > 0
-                    ? `Google sync: imported ${events} event(s), ${tasks} task(s), ${failed} failed${errors.length ? ` (${errors.join("; ")})` : ""}.${orphanSuffix}${lifecycleSuffix}`
-                    : `Google sync: imported ${events} event(s) and ${tasks} task(s).${orphanSuffix}${lifecycleSuffix}`,
+                formatImportNotice(
+                    { events, tasks, failed, orphaned, errors },
+                    `${orphanSuffix}${lifecycleSuffix}`,
+                ),
+                10000,
             );
         } catch (e) {
-            new Notice(`Google sync import error: ${(e as Error).message}`);
+            new Notice(`Google sync import error: ${describeGoogleError(e)}`);
         }
     }
 

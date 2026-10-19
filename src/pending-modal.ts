@@ -1,5 +1,5 @@
 import { App, Modal } from "obsidian";
-import type { PendingLine } from "./sync/push-report";
+import { PendingLine, pendingHeading } from "./sync/push-report";
 
 /** Preview (dry run) result: one row per note with pending updates and the fields that changed. */
 export class PendingUpdatesModal extends Modal {
@@ -15,7 +15,7 @@ export class PendingUpdatesModal extends Modal {
         contentEl.addClass("google-sync-pending");
         this.setTitle("Pending Google updates");
         contentEl.createEl("p", {
-            text: `${this.lines.length} note(s) would be pushed. Nothing has been sent (dry run).`,
+            text: `${pendingHeading(this.lines.length)} Nothing has been sent (dry run).`,
         });
         const list = contentEl.createEl("ul");
         for (const line of this.lines) {

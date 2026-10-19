@@ -204,7 +204,13 @@ describe("click-through: connect, import, edit, preview, push", function () {
     it("Push confirmed with nothing pending says nothing to push", async () => {
         await clearNotices();
         await runCommand("Push pending updates (confirmed)");
-        expect(await waitForNotice("Google sync:")).to.contain(NOTHING);
+        // The pull-only and unlinked notes from the guard step are still there: the notice
+        // must say nothing was pushed AND why they were left, never "everything is up to date".
+        const n = await waitForNotice("Google sync:");
+        expect(n).to.contain("nothing to push");
+        expect(n).to.not.contain("up to date");
+        expect(n).to.contain("1 pull-only");
+        expect(n).to.contain("1 not linked to Google (no googleId)");
         await shot("notice-push-confirmed-nothing");
     });
 
