@@ -326,3 +326,14 @@ describe("invariants predicate", () => {
         ).to.equal(false);
     });
 });
+
+describe("mock Google: unlisted events", () => {
+    it("an unlisted event is absent from the listing but still answers GET", async () => {
+        const fx = defaultFixture(NOW);
+        fx.unlistedEvents = ["primary/import-event-1"];
+        const { cal } = wire(fx);
+        const listed = await cal.listEvents("primary");
+        expect(listed.items.map((e) => e.id)).to.not.include("import-event-1");
+        expect((await cal.getEvent("primary", "import-event-1")).id).to.equal("import-event-1");
+    });
+});

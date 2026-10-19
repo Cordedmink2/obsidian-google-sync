@@ -153,3 +153,28 @@ export async function setMockErrors(rules: MockErrorRule[]): Promise<void> {
         mock.state.errors = JSON.parse(json) as MockErrorRule[];
     }, JSON.stringify(rules));
 }
+
+/**
+ * Event leaves the listing but GET still answers it. With `status` "cancelled" this is
+ * how Google reports a deletion the listing did not surface; "confirmed" is an item that
+ * merely fell outside the listing and must NOT be treated as deleted.
+ */
+export async function unlistEventInGoogle(
+    calendarId: string,
+    id: string,
+    status: "cancelled" | "confirmed",
+): Promise<void> {
+    await browser.executeObsidian(
+        (_c, cal: string, eid: string, st: string) => {
+            const mock = (window as unknown as { __gsyncMock: { state: MockFixture } }).__gsyncMock;
+            const list = mock.state.events[cal] ?? (mock.state.events[cal] = []);
+            const ev = list.find((e) => e.id === eid);
+            if (ev) ev.status = st;
+            else list.push({ kind: "calendar#event", id: eid, status: st, summary: "unlisted" });
+            mock.state.unlistedEvents = [...(mock.state.unlistedEvents ?? []), `${cal}/${eid}`];
+        },
+        calendarId,
+        id,
+        status,
+    );
+}

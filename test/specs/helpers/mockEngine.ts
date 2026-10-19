@@ -44,6 +44,8 @@ export interface MockFixture {
     tasks: Record<string, Record<string, unknown>[]>;
     /** Items answered with 404/410 instead of a resource, e.g. {"primary/ev1": 410}. */
     removedEvents?: Record<string, number>;
+    /** "calendar/id" keys left out of listings but still answering GET (e.g. outside the window). */
+    unlistedEvents?: string[];
     removedTasks?: Record<string, number>;
     errors?: MockErrorRule[];
 }
@@ -181,7 +183,12 @@ export function createGoogleMock(fixture: MockFixture): MockHandle {
                 const cal = decodeURIComponent(m[1] as string);
                 if (!state.events[cal]) return fail(404, `Not Found: calendar ${cal}`);
                 const removed = state.removedEvents ?? {};
-                let items = state.events[cal].filter((e) => !(`${cal}/${String(e.id)}` in removed));
+                const unlisted = state.unlistedEvents ?? [];
+                let items = state.events[cal].filter(
+                    (e) =>
+                        !(`${cal}/${String(e.id)}` in removed) &&
+                        !unlisted.includes(`${cal}/${String(e.id)}`),
+                );
                 if (params.get("showDeleted") !== "true")
                     items = items.filter((e) => e.status !== "cancelled");
                 const min = params.get("timeMin");
