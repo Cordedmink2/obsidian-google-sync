@@ -21,6 +21,65 @@ export interface HttpResponse {
 
 export type HttpFn = (req: HttpRequest) => Promise<HttpResponse>;
 
+/** Thrown, before anything is sent, when a request could create or delete Google data. */
+export class UnsafeRequestError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "UnsafeRequestError";
+    }
+}
+
+const TOKEN_ENDPOINT = { host: "oauth2.googleapis.com", path: /^\/token$/ };
+const TASKS_MOVE = {
+    host: "tasks.googleapis.com",
+    path: /^\/tasks\/v1\/lists\/[^/]+\/tasks\/[^/]+\/move$/,
+};
+
+function isAllowedPost(url: string): boolean {
+    let u: URL;
+    try {
+        u = new URL(url);
+    } catch {
+        return false;
+    }
+    if (u.protocol !== "https:") return false;
+    return [TOKEN_ENDPOINT, TASKS_MOVE].some(
+        (r) => u.hostname === r.host && r.path.test(u.pathname),
+    );
+}
+
+const GUARDED = Symbol.for("google-sync.guardedHttp");
+
+/**
+ * Defence in depth for the one-way contract: this plugin never creates or deletes Google
+ * data. Wraps a transport so any DELETE, and any POST other than the OAuth token endpoint
+ * and Tasks `/move` (which only repositions an existing task), throws before sending.
+ * PATCH (including the Meet `conferenceData.createRequest`) and GET are unaffected.
+ */
+export function guardHttp(inner: HttpFn): HttpFn {
+    if ((inner as unknown as Record<symbol, unknown>)[GUARDED]) return inner;
+    const guarded: HttpFn = (req) => {
+        const method = (req.method ?? "GET").toUpperCase();
+        if (method === "DELETE") {
+            return Promise.reject(
+                new UnsafeRequestError(
+                    `Refusing DELETE ${req.url}: this plugin never deletes Google data.`,
+                ),
+            );
+        }
+        if (method === "POST" && !isAllowedPost(req.url)) {
+            return Promise.reject(
+                new UnsafeRequestError(
+                    `Refusing POST ${req.url}: this plugin never creates Google data.`,
+                ),
+            );
+        }
+        return inner(req);
+    };
+    (guarded as unknown as Record<symbol, unknown>)[GUARDED] = true;
+    return guarded;
+}
+
 /** Parse a JSON body, tolerating empty/non-JSON payloads (e.g. error pages, 204s). */
 export function parseJson(text: string): unknown {
     try {

@@ -9,8 +9,8 @@ or [Tasks resource](https://developers.google.com/tasks/reference/rest/v1/tasks)
 
 | Field                                                                   | Type               | Notes                                                                                                                                                            |
 | ----------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `title`                                                                 | string             | Required on create. Maps to `summary`.                                                                                                                           |
-| `date`                                                                  | ISO datetime/date  | Start. Required on create. `2026-06-18T10:00` or `2026-06-18` with `allDay`.                                                                                     |
+| `title`                                                                 | string             | Maps to `summary`.                                                                                                                                               |
+| `date`                                                                  | ISO datetime/date  | Start. `2026-06-18T10:00` or `2026-06-18` with `allDay`.                                                                                                         |
 | `end`                                                                   | ISO datetime/date  | Optional; all-day events default to the next day.                                                                                                                |
 | `allDay`                                                                | boolean            | Use date-only `date`/`end`.                                                                                                                                      |
 | `timezone`                                                              | IANA string        | e.g. `Pacific/Auckland`; defaults to the config timezone.                                                                                                        |
@@ -35,7 +35,7 @@ Flag, not field: `--send-updates all|externalOnly|none` controls invitation/upda
 
 | Field       | Type     | Notes                                                    |
 | ----------- | -------- | -------------------------------------------------------- |
-| `title`     | string   | Required on create.                                      |
+| `title`     | string   | The task title.                                          |
 | `notes`     | string   | The task's details/description.                          |
 | `due`       | ISO date | Google honors the date part only.                        |
 | `completed` | boolean  | Or set `status` directly (`needsAction` \| `completed`). |
@@ -45,10 +45,10 @@ the Google API works.
 
 ## Worked examples
 
-Invite people to a new event and email them:
+Invite people to an existing event and email them:
 
 ```bash
-node scripts/google.cjs events create --send-updates all --json '{
+node scripts/google.cjs events update <eventId> --send-updates all --json '{
   "title": "Design review", "date": "2026-06-19T14:00", "end": "2026-06-19T15:00",
   "attendees": [
     { "email": "alex@example.com", "displayName": "Alex" },
@@ -57,10 +57,10 @@ node scripts/google.cjs events create --send-updates all --json '{
 }'
 ```
 
-Create a weekly recurring event with a Meet link and a 10-minute popup reminder:
+Make an existing event weekly, with a Meet link and a 10-minute popup reminder:
 
 ```bash
-node scripts/google.cjs events create --json '{
+node scripts/google.cjs events update <eventId> --json '{
   "title": "Team standup", "date": "2026-06-15T09:15", "end": "2026-06-15T09:30",
   "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR",
   "conferencing": true,
@@ -82,16 +82,16 @@ Set an event's type and color:
 node scripts/google.cjs events update abc123def --json '{ "eventType": "deep-work", "color": "9" }'
 ```
 
-Add an all-day event:
+Make an existing event all-day:
 
 ```bash
-node scripts/google.cjs events create --json '{ "title": "Public holiday", "date": "2026-06-22", "allDay": true }'
+node scripts/google.cjs events update <eventId> --json '{ "title": "Public holiday", "date": "2026-06-22", "allDay": true }'
 ```
 
-Create a task with details and a deadline, then complete / uncomplete it:
+Set details and a deadline on an existing task, then complete / uncomplete it:
 
 ```bash
-node scripts/google.cjs tasks create --json '{ "title": "Renew passport", "due": "2026-07-01", "notes": "Bring old passport + photos" }'
+node scripts/google.cjs tasks update <taskId> --json '{ "title": "Renew passport", "due": "2026-07-01", "notes": "Bring old passport + photos" }'
 node scripts/google.cjs tasks complete  <taskId>
 node scripts/google.cjs tasks uncomplete <taskId>
 ```

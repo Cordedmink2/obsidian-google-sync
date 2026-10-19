@@ -1,6 +1,6 @@
 import { Notice, Plugin, TFile } from "obsidian";
 import { DEFAULT_SETTINGS, GoogleSyncSettings, GoogleSyncSettingTab } from "./settings";
-import { HttpFn } from "./google/http";
+import { HttpFn, guardHttp } from "./google/http";
 import { obsidianHttp } from "./google/transport";
 import { DEFAULT_SCOPES, GoogleAuth, OAuthConfig, TokenSet, TokenStore } from "./google/auth";
 import { CalendarListEntry, GoogleCalendarClient } from "./google/calendar";
@@ -62,10 +62,10 @@ export default class GoogleSyncPlugin extends Plugin {
         await this.loadAll();
 
         // Late-bound transport so e2e can inject a mock after load.
-        this.http = (req) => {
+        this.http = guardHttp((req) => {
             const injected = (window as unknown as { __gsyncHttp?: HttpFn }).__gsyncHttp;
             return (typeof injected === "function" ? injected : obsidianHttp)(req);
-        };
+        });
 
         this.auth = new GoogleAuth(this.http, () => this.oauthConfig(), this.tokenStore());
         const tokenProvider = () => this.auth.getAccessToken();

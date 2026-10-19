@@ -1,14 +1,15 @@
 ---
 name: google-tasks-calendar
-description: Create, read, and update Google Calendar events and Google Tasks — list/reschedule/complete/uncomplete tasks, set task details, create one-off or recurring events, invite attendees, request Google Meet links, set reminders/colors/visibility, nest subtasks. Use when the user asks about their calendar, schedule, meetings, events, tasks, or todos. Deleting is intentionally not supported.
+description: Read and update existing Google Calendar events and Google Tasks — list, reschedule, complete/uncomplete tasks, edit task details, add attendees or a Google Meet link to an existing event, set reminders/colors/visibility, nest subtasks. Use when the user asks about their calendar, schedule, meetings, events, tasks, or todos. Creating and deleting are intentionally not supported.
 ---
 
 # Google Tasks & Calendar
 
 Drive Google Calendar and Google Tasks through `scripts/google.cjs` (Node ≥ 20, bundled,
-no install). Everything is create/read/update — **there are no delete commands**; if the
-user asks to delete something, say you can't and offer to cancel-by-updating instead
-(e.g. mark a task completed, set an event's `status` to `cancelled`).
+no install). Everything is read/update on items that already exist — **there are no create
+or delete commands**. If the user asks to create or delete something, say you can't and that
+they should do it in Google Calendar or Google Tasks; for a delete you can offer to update
+instead (e.g. mark a task completed).
 
 ## Running it
 
@@ -33,12 +34,10 @@ tasklists list                      # discover task list ids
 
 events list      [--calendar <id>] [--days-past N] [--days-ahead N]
 events get       <eventId>  [--calendar <id>]
-events create    --json '<event>'  [--calendar <id>] [--send-updates all|externalOnly|none]
 events update    <eventId> --json '<changed fields>' [--calendar <id>] [--send-updates ...]
 
 tasks list       [--tasklist <id>]
 tasks get        <taskId>   [--tasklist <id>]
-tasks create     --json '<task>' [--tasklist <id>] [--parent <taskId>] [--previous <taskId>]
 tasks update     <taskId> --json '<changed fields>' [--tasklist <id>]
 tasks complete   <taskId>   [--tasklist <id>]
 tasks uncomplete <taskId>   [--tasklist <id>]
@@ -72,13 +71,12 @@ from the config file.
 }
 ```
 
-- `title` + `date` are required on create; everything else is optional.
+- Every field is optional on update; send only what changes.
 - **Invite people**: `attendees` (simple lists above, or detailed objects with
   `displayName`/`responseStatus`/`optional`/`comment`/`additionalGuests` — see
   reference.md). Add `--send-updates all` so Google emails the invitations.
-- **Recurring on creation**: `recurrence` takes an RRULE string or a list of
-  RRULE/EXDATE/RDATE lines.
-- **Google Meet**: `"conferencing": true` — the response contains the new link in
+- **Recurrence**: `recurrence` takes an RRULE string or a list of RRULE/EXDATE/RDATE lines.
+- **Google Meet**: `"conferencing": true` — the response contains the link in
   `hangoutLink`.
 - **Event type**: `eventType` is a free-form label; `color` is a Google colorId "1"–"11".
 
@@ -93,9 +91,9 @@ from the config file.
 }
 ```
 
-- `title` required on create. `notes` is the task's details/description field.
+- `notes` is the task's details/description field.
 - `due` is date-only in Google Tasks (time parts are ignored by Google).
-- **Subtasks**: create with `--parent <taskId>`, or re-nest later with
+- **Subtasks**: nest an existing task with
   `tasks move <id> --parent <parentId>` (omit `--parent` to promote to top level).
 
 ## Obsidian vault interplay (when the user also syncs a vault)

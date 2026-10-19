@@ -7,14 +7,13 @@ import { GoogleCalendarClient, WriteEventOptions } from "../src/google/calendar"
 import { GoogleTasksClient } from "../src/google/tasks";
 import { GoogleApiError } from "../src/google/api";
 import { eventToGoogle, taskToGoogle } from "../src/sync/mapper";
-import { validateEvent, validateTask } from "../src/sync/frontmatter";
 import { EventFrontmatter, GoogleEvent, GoogleTask, TaskFrontmatter } from "../src/types";
 import { nodeFetchHttp } from "./transport";
 import { FileTokenStore } from "./token-store";
 import { HeadlessConfig, loadConfig } from "./config";
 
 /**
- * Agent-facing CLI for Google Calendar + Tasks: create, read, and update — never delete.
+ * Agent-facing CLI for Google Calendar + Tasks: read and update existing items only — never create or delete.
  * JSON in (--json or stdin), JSON out, non-zero exit + JSON error on failure, so AI
  * agents can drive it and self-correct. Shares the headless config + token file with the
  * sync script. Input uses the same field vocabulary as the plugin's note frontmatter
@@ -26,8 +25,8 @@ import { HeadlessConfig, loadConfig } from "./config";
  * Groups/commands:
  *   calendars list
  *   tasklists list
- *   events    list|get <id>|create|update <id>
- *   tasks     list|get <id>|create|update <id>|complete <id>|uncomplete <id>|move <id>
+ *   events    list|get <id>|update <id>
+ *   tasks     list|get <id>|update <id>|complete <id>|uncomplete <id>|move <id>
  */
 
 const USAGE = `usage: google --config <gsync.json> <group> <command> [id] [flags]
@@ -37,12 +36,10 @@ const USAGE = `usage: google --config <gsync.json> <group> <command> [id] [flags
 
   events list     [--calendar <id>] [--days-past N] [--days-ahead N]
   events get      <eventId> [--calendar <id>]
-  events create   --json '<event>' [--calendar <id>] [--send-updates all|externalOnly|none] [--raw]
   events update   <eventId> --json '<fields>' [--calendar <id>] [--send-updates ...] [--raw]
 
   tasks list      [--tasklist <id>]
   tasks get       <taskId> [--tasklist <id>]
-  tasks create    --json '<task>' [--tasklist <id>] [--parent <taskId>] [--previous <taskId>]
   tasks update    <taskId> --json '<fields>' [--tasklist <id>] [--raw]
   tasks complete  <taskId> [--tasklist <id>]
   tasks uncomplete <taskId> [--tasklist <id>]
@@ -154,14 +151,7 @@ function output(value: unknown): void {
 function eventBody(
     input: Record<string, unknown>,
     config: HeadlessConfig,
-    requireComplete: boolean,
 ): { body: GoogleEvent; opts: WriteEventOptions } {
-    if (requireComplete) {
-        const v = validateEvent(input);
-        if (!v.ok) fail(`invalid event: ${v.errors.join("; ")}`);
-    } else if (input.date == null && input.end == null && input.title == null) {
-        // partial update with no mapped basics is fine
-    }
     const fm = input as EventFrontmatter;
     const body = eventToGoogle(fm, config.settings.defaultTimezone);
     if (input.title == null) delete body.summary;
@@ -183,15 +173,7 @@ function eventBody(
 }
 
 /** Map frontmatter-style task input to a Google body. */
-function taskBody(
-    input: Record<string, unknown>,
-    config: HeadlessConfig,
-    requireComplete: boolean,
-): GoogleTask {
-    if (requireComplete) {
-        const v = validateTask(input);
-        if (!v.ok) fail(`invalid task: ${v.errors.join("; ")}`);
-    }
+function taskBody(input: Record<string, unknown>, config: HeadlessConfig): GoogleTask {
     const body = taskToGoogle(input as TaskFrontmatter, config.settings.defaultTimezone);
     if (input.title == null) delete body.title;
     if (input.completed == null && input.status == null) delete body.status;
@@ -252,20 +234,12 @@ async function main(): Promise<void> {
             output(await calendar.getEvent(calendarId, id));
             return;
         }
-        case "events create": {
-            const input = await readJsonInput(flags);
-            const { body, opts } = flags.raw
-                ? { body: input as GoogleEvent, opts: {} }
-                : eventBody(input, config, true);
-            output(await calendar.insertEvent(calendarId, body, { ...opts, ...writeOpts }));
-            return;
-        }
         case "events update": {
             if (!id) fail("usage: events update <eventId> --json '<fields>'");
             const input = await readJsonInput(flags);
             const { body, opts } = flags.raw
                 ? { body: input as GoogleEvent, opts: {} }
-                : eventBody(input, config, false);
+                : eventBody(input, config);
             output(await calendar.patchEvent(calendarId, id, body, { ...opts, ...writeOpts }));
             return;
         }
@@ -278,21 +252,10 @@ async function main(): Promise<void> {
             output(await tasks.getTask(taskListId, id));
             return;
         }
-        case "tasks create": {
-            const input = await readJsonInput(flags);
-            const body = flags.raw ? (input as GoogleTask) : taskBody(input, config, true);
-            output(
-                await tasks.insertTask(taskListId, body, {
-                    parent: flags.parent,
-                    previous: flags.previous,
-                }),
-            );
-            return;
-        }
         case "tasks update": {
             if (!id) fail("usage: tasks update <taskId> --json '<fields>'");
             const input = await readJsonInput(flags);
-            const body = flags.raw ? (input as GoogleTask) : taskBody(input, config, false);
+            const body = flags.raw ? (input as GoogleTask) : taskBody(input, config);
             output(await tasks.patchTask(taskListId, id, body));
             return;
         }

@@ -1,4 +1,4 @@
-import { HttpFn, HttpResponse, RetryOptions, withRetry } from "./http";
+import { HttpFn, HttpResponse, RetryOptions, guardHttp, withRetry } from "./http";
 
 /** A non-2xx Google API response. `body` is the parsed error payload when available. */
 export class GoogleApiError extends Error {
@@ -45,10 +45,11 @@ export async function apiCall(
     retry: RetryOptions,
     { method, url, body }: ApiCall,
 ): Promise<unknown> {
+    const send = guardHttp(http);
     const token = await getToken();
     const res: HttpResponse = await withRetry(
         () =>
-            http({
+            send({
                 url,
                 method,
                 headers: { Authorization: `Bearer ${token}` },

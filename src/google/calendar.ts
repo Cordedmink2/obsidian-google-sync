@@ -23,7 +23,7 @@ export interface ListEventsResult {
     nextSyncToken?: string;
 }
 
-/** Write-time toggles that map to query params on insert/patch. */
+/** Write-time toggles that map to query params on patch. */
 export interface WriteEventOptions {
     conferenceDataVersion?: number; // 1 = let Google create/return Meet conference data
     supportsAttachments?: boolean; // required when sending `attachments`
@@ -48,18 +48,6 @@ export class GoogleCalendarClient {
 
     private call(c: ApiCall): Promise<unknown> {
         return apiCall(this.http, this.getToken, this.retry, c);
-    }
-
-    async insertEvent(
-        calendarId: string,
-        event: GoogleEvent,
-        options: WriteEventOptions = {},
-    ): Promise<GoogleEvent> {
-        return (await this.call({
-            method: "POST",
-            url: addQuery(`${BASE}/calendars/${enc(calendarId)}/events`, writeQuery(options)),
-            body: event,
-        })) as GoogleEvent;
     }
 
     async getEvent(calendarId: string, eventId: string): Promise<GoogleEvent> {
