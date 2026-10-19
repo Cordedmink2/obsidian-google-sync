@@ -15,12 +15,15 @@ function install(_ctx: unknown, engineSource: string, fixtureJson: string): void
     const w = window as unknown as Record<string, unknown>;
     // tsx may emit keepNames helpers inside the serialized engine source.
     if (typeof w.__name !== "function") w.__name = (f: unknown) => f;
+    // Test-only: evaluates our own mock engine source (mockEngine.ts) inside the renderer.
+    /* eslint-disable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call */
     const create = new Function(`return (${engineSource})`)() as (f: unknown) => {
         http: (r: { url: string; method?: string; body?: string }) => Promise<unknown>;
         unknown: MockCall[];
         state: unknown;
     };
     const mock = create(JSON.parse(fixtureJson));
+    /* eslint-enable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call */
     const calls: MockCall[] = [];
     const audit: MockCall[] = [];
     w.__gsyncE2E = true;
@@ -100,7 +103,7 @@ export async function cancelEventInGoogle(calendarId: string, id: string): Promi
     await browser.executeObsidian(
         (_c, cal: string, eid: string) => {
             const mock = (window as unknown as { __gsyncMock: { state: MockFixture } }).__gsyncMock;
-            const list = (mock.state.events[cal] ?? []) as Record<string, unknown>[];
+            const list = mock.state.events[cal] ?? [];
             const i = list.findIndex((e) => e.id === eid);
             const stub = { kind: "calendar#event", id: eid, status: "cancelled" };
             if (i >= 0) list[i] = stub;
@@ -116,9 +119,7 @@ export async function deleteTaskInGoogle(listId: string, id: string): Promise<vo
     await browser.executeObsidian(
         (_c, list: string, tid: string) => {
             const mock = (window as unknown as { __gsyncMock: { state: MockFixture } }).__gsyncMock;
-            const t = ((mock.state.tasks[list] ?? []) as Record<string, unknown>[]).find(
-                (x) => x.id === tid,
-            );
+            const t = (mock.state.tasks[list] ?? []).find((x) => x.id === tid);
             if (t) t.deleted = true;
         },
         listId,

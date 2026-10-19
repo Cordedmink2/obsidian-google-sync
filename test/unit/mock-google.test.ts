@@ -110,7 +110,7 @@ describe("mock Google: state and routes", () => {
         const ev = await cal.patchEvent(
             "primary",
             "ev-conf",
-            { conferenceData: { createRequest: { requestId: "r1" } } as never },
+            { conferenceData: { createRequest: { requestId: "r1" } } },
             { conferenceDataVersion: 1 },
         );
         expect(ev.hangoutLink).to.equal("https://meet.google.com/e2e-link");
@@ -267,7 +267,7 @@ describe("fixtures", () => {
         expect(r.some((e) => e.status === "cancelled" && e.recurringEventId === "series")).to.equal(
             true,
         );
-        expect(r.some((e) => (e.originalStartTime as unknown) !== undefined)).to.equal(true);
+        expect(r.some((e) => e.originalStartTime !== undefined)).to.equal(true);
     });
 
     it("bulk fixture is 500+ items with awkward titles and missing-parent subtasks", () => {
@@ -279,7 +279,7 @@ describe("fixtures", () => {
         expect(AWKWARD_TITLES.length).to.be.greaterThan(5);
         const all = Object.values(b.tasks).flat();
         const ids = new Set(all.map((t) => t.id));
-        expect(all.some((t) => t.parent && ids.has(t.parent as string))).to.equal(true);
+        expect(all.some((t) => t.parent && ids.has(t.parent))).to.equal(true);
     });
 });
 

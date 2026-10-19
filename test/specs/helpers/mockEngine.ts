@@ -181,9 +181,7 @@ export function createGoogleMock(fixture: MockFixture): MockHandle {
                 const cal = decodeURIComponent(m[1] as string);
                 if (!state.events[cal]) return fail(404, `Not Found: calendar ${cal}`);
                 const removed = state.removedEvents ?? {};
-                let items = (state.events[cal] as Json[]).filter(
-                    (e) => !(`${cal}/${String(e.id)}` in removed),
-                );
+                let items = state.events[cal].filter((e) => !(`${cal}/${String(e.id)}` in removed));
                 if (params.get("showDeleted") !== "true")
                     items = items.filter((e) => e.status !== "cancelled");
                 const min = params.get("timeMin");
@@ -263,7 +261,7 @@ export function createGoogleMock(fixture: MockFixture): MockHandle {
                 const list = decodeURIComponent(m[1] as string);
                 if (!state.tasks[list]) return fail(404, `Task list not found: ${list}`);
                 const removed = state.removedTasks ?? {};
-                let items = (state.tasks[list] as Json[]).filter(
+                let items = state.tasks[list].filter(
                     (t) => !(`${list}/${String(t.id)}` in removed) && t.deleted !== true,
                 );
                 if (params.get("showCompleted") === "false")
