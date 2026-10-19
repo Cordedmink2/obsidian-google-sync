@@ -37,7 +37,7 @@ export interface ApiCall {
 /**
  * Shared Google REST call: attach bearer auth, JSON-encode the body, retry transient
  * failures (via withRetry), and throw GoogleApiError on non-2xx. Returns the parsed JSON
- * (undefined for empty 2xx like 204).
+ * (a 2xx with an empty or unparseable body throws; no Google call here returns 204).
  */
 export async function apiCall(
     http: HttpFn,
@@ -63,6 +63,16 @@ export async function apiCall(
             res.status,
             `${method} ${url} -> ${res.status}`,
             res.json ?? res.text,
+        );
+    }
+    // Every endpoint this plugin calls answers with a JSON object. A 2xx whose body is
+    // empty or unparseable (truncated, an HTML interstitial) must not be read as "no items"
+    // or crash a caller with a TypeError: report it as a clear API error instead.
+    if (res.json === undefined || res.json === null || typeof res.json !== "object") {
+        throw new GoogleApiError(
+            res.status,
+            `${method} ${url} -> ${res.status} but the response body was empty or malformed (unreadable JSON)`,
+            res.text,
         );
     }
     return res.json;

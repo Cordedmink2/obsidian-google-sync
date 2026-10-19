@@ -1,131 +1,40 @@
 import { browser } from "@wdio/globals";
+import { createGoogleMock, MockCall, MockErrorRule, MockFixture } from "./mockEngine";
+import { defaultFixture } from "./fixtures";
+import "./invariantHook";
 
-export interface MockCall {
-    method: string;
-    url: string;
-    body?: string;
-}
+export type { MockCall, MockErrorRule, MockFixture };
 
 /**
- * Self-contained (serialized into the Obsidian renderer): installs a recording fake
- * transport at window.__gsyncHttp + an e2e flag. The plugin's late-bound transport picks
- * it up, so no real network happens. All references are local — no imports.
+ * Installs the stateful fake Google (see mockEngine.ts) at window.__gsyncHttp. Two logs:
+ *   __gsyncCalls  - resettable, for per-test assertions;
+ *   __gsyncAudit  - append-only, read by the global invariant hook (invariantHook.ts).
+ * Self-contained when serialized into the renderer: only its arguments are used.
  */
-function install(): void {
-    const w = window as unknown as {
-        __gsyncE2E?: boolean;
-        __gsyncHttp?: unknown;
-        __gsyncCalls?: MockCall[];
+function install(_ctx: unknown, engineSource: string, fixtureJson: string): void {
+    const w = window as unknown as Record<string, unknown>;
+    // tsx may emit keepNames helpers inside the serialized engine source.
+    if (typeof w.__name !== "function") w.__name = (f: unknown) => f;
+    const create = new Function(`return (${engineSource})`)() as (f: unknown) => {
+        http: (r: { url: string; method?: string; body?: string }) => Promise<unknown>;
+        unknown: MockCall[];
+        state: unknown;
     };
+    const mock = create(JSON.parse(fixtureJson));
     const calls: MockCall[] = [];
-    let seq = 0;
+    const audit: MockCall[] = [];
     w.__gsyncE2E = true;
     w.__gsyncCalls = calls;
-    // "Upcoming" fixtures are relative to now so they never age into the lifecycle's
-    // archive window; "past" fixtures use fixed long-past dates on purpose.
-    const futureIso = (days: number, plusHours = 0): string => {
-        const d = new Date();
-        d.setDate(d.getDate() + days);
-        d.setHours(9 + plusHours, 0, 0, 0);
-        return d.toISOString();
-    };
-    const futureDueIso = (days: number): string => {
-        const d = new Date();
-        d.setDate(d.getDate() + days);
-        return `${d.toISOString().slice(0, 10)}T00:00:00.000Z`;
-    };
+    w.__gsyncAudit = audit;
+    w.__gsyncAuditCursor = 0;
+    w.__gsyncUnknown = mock.unknown;
+    w.__gsyncUnknownCursor = 0;
+    w.__gsyncMock = mock;
     w.__gsyncHttp = (req: { url: string; method?: string; body?: string }) => {
-        const method = req.method ?? "GET";
-        calls.push({ method, url: req.url, body: req.body });
-        const headers: Record<string, string> = {};
-        const ok = (json: unknown, status = 200) =>
-            Promise.resolve({ status, headers, text: JSON.stringify(json), json });
-        if (method === "DELETE")
-            return Promise.resolve({ status: 204, headers, text: "", json: undefined });
-        if (req.url.includes("/calendarList"))
-            return ok({
-                items: [
-                    { id: "primary", primary: true },
-                    { id: "secondary", summary: "Secondary calendar" },
-                ],
-            });
-        if (method === "GET" && req.url.includes("/calendars/primary/events"))
-            return ok({
-                items: [
-                    {
-                        id: "import-event-1",
-                        summary: "Imported appointment",
-                        start: { dateTime: futureIso(5), timeZone: "Pacific/Auckland" },
-                        end: { dateTime: futureIso(5, 1), timeZone: "Pacific/Auckland" },
-                    },
-                    {
-                        id: "past-import-event-1",
-                        summary: "Past imported appointment",
-                        start: {
-                            dateTime: "2026-01-02T09:00:00+13:00",
-                            timeZone: "Pacific/Auckland",
-                        },
-                        end: {
-                            dateTime: "2026-01-02T10:00:00+13:00",
-                            timeZone: "Pacific/Auckland",
-                        },
-                    },
-                ],
-                nextSyncToken: "sync-token",
-            });
-        if (method === "GET" && req.url.includes("/calendars/secondary/events"))
-            return ok({
-                items: [
-                    {
-                        id: "secondary-event-1",
-                        summary: "Secondary appointment",
-                        start: { dateTime: futureIso(6), timeZone: "Pacific/Auckland" },
-                        end: { dateTime: futureIso(6, 1), timeZone: "Pacific/Auckland" },
-                    },
-                ],
-            });
-        if (req.url.includes("/users/@me/lists"))
-            return ok({
-                items: [
-                    { id: "@default", title: "My Tasks" },
-                    { id: "L1", title: "Test list" },
-                ],
-            });
-        if (method === "GET" && req.url.includes("/lists/%40default/tasks"))
-            return ok({
-                items: [
-                    {
-                        id: "default-import-task-1",
-                        title: "Default list task",
-                        due: futureDueIso(10),
-                        status: "needsAction",
-                    },
-                ],
-            });
-        if (method === "GET" && req.url.includes("/lists/L1/tasks"))
-            return ok({
-                items: [
-                    {
-                        id: "import-task-1",
-                        title: "Imported task",
-                        due: futureDueIso(10),
-                        status: "needsAction",
-                    },
-                    {
-                        id: "late-import-task-1",
-                        title: "Late imported task",
-                        due: "2026-01-01T00:00:00.000Z",
-                        status: "needsAction",
-                    },
-                ],
-            });
-        if (req.url.includes("oauth2.googleapis.com/token"))
-            return ok({ access_token: "e2e", expires_in: 3600, refresh_token: "rt" });
-        if (req.url.includes("conferenceDataVersion=") && (method === "POST" || method === "PATCH"))
-            return ok({ id: `mock-${++seq}`, hangoutLink: "https://meet.google.com/e2e-link" });
-        if (method === "POST") return ok({ id: `mock-${++seq}` });
-        if (method === "PATCH") return ok({ id: "patched" });
-        return ok({});
+        const entry = { method: (req.method ?? "GET").toUpperCase(), url: req.url, body: req.body };
+        calls.push(entry);
+        audit.push(entry);
+        return mock.http(req);
     };
 }
 
@@ -147,8 +56,9 @@ async function seedAndConfigure({ app }: { app: unknown }): Promise<void> {
 }
 
 /** Install the mock, seed a token, and configure the plugin for e2e. */
-export async function setupGoogleSyncMock(): Promise<void> {
-    await browser.executeObsidian(install);
+export async function setupGoogleSyncMock(fixture?: MockFixture): Promise<void> {
+    const fx = fixture ?? defaultFixture(new Date());
+    await browser.executeObsidian(install, createGoogleMock.toString(), JSON.stringify(fx));
     await browser.executeObsidian(seedAndConfigure);
 }
 
@@ -163,4 +73,82 @@ export async function resetMockCalls(): Promise<void> {
         const calls = (window as unknown as { __gsyncCalls?: MockCall[] }).__gsyncCalls;
         if (calls) calls.length = 0;
     });
+}
+
+/** Mark an event as removed from Google: GET answers 404 or 410. */
+export async function removeEventInGoogle(
+    calendarId: string,
+    id: string,
+    status: 404 | 410 = 410,
+): Promise<void> {
+    await browser.executeObsidian(
+        (_c, cal: string, eid: string, st: number) => {
+            const mock = (window as unknown as { __gsyncMock: { state: MockFixture } }).__gsyncMock;
+            mock.state.removedEvents = {
+                ...(mock.state.removedEvents ?? {}),
+                [`${cal}/${eid}`]: st,
+            };
+        },
+        calendarId,
+        id,
+        status,
+    );
+}
+
+/** Replace an event in Google with a cancelled stub (what showDeleted listings return). */
+export async function cancelEventInGoogle(calendarId: string, id: string): Promise<void> {
+    await browser.executeObsidian(
+        (_c, cal: string, eid: string) => {
+            const mock = (window as unknown as { __gsyncMock: { state: MockFixture } }).__gsyncMock;
+            const list = (mock.state.events[cal] ?? []) as Record<string, unknown>[];
+            const i = list.findIndex((e) => e.id === eid);
+            const stub = { kind: "calendar#event", id: eid, status: "cancelled" };
+            if (i >= 0) list[i] = stub;
+            else list.push(stub);
+        },
+        calendarId,
+        id,
+    );
+}
+
+/** Mark a task deleted in Google (`deleted: true`; hidden from the listing, GET still answers). */
+export async function deleteTaskInGoogle(listId: string, id: string): Promise<void> {
+    await browser.executeObsidian(
+        (_c, list: string, tid: string) => {
+            const mock = (window as unknown as { __gsyncMock: { state: MockFixture } }).__gsyncMock;
+            const t = ((mock.state.tasks[list] ?? []) as Record<string, unknown>[]).find(
+                (x) => x.id === tid,
+            );
+            if (t) t.deleted = true;
+        },
+        listId,
+        id,
+    );
+}
+
+/** Task is removed entirely: GET answers 404 or 410. */
+export async function removeTaskInGoogle(
+    listId: string,
+    id: string,
+    status: 404 | 410 = 404,
+): Promise<void> {
+    await browser.executeObsidian(
+        (_c, list: string, tid: string, st: number) => {
+            const mock = (window as unknown as { __gsyncMock: { state: MockFixture } }).__gsyncMock;
+            mock.state.removedTasks = {
+                ...(mock.state.removedTasks ?? {}),
+                [`${list}/${tid}`]: st,
+            };
+        },
+        listId,
+        id,
+        status,
+    );
+}
+
+export async function setMockErrors(rules: MockErrorRule[]): Promise<void> {
+    await browser.executeObsidian((_c, json: string) => {
+        const mock = (window as unknown as { __gsyncMock: { state: MockFixture } }).__gsyncMock;
+        mock.state.errors = JSON.parse(json) as MockErrorRule[];
+    }, JSON.stringify(rules));
 }

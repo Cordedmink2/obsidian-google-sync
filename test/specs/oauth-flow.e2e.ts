@@ -1,4 +1,5 @@
 import { browser, expect } from "@wdio/globals";
+import "./helpers/invariantHook";
 import { before, describe, it } from "mocha";
 import { setupGoogleSyncMock } from "./helpers/mockGoogle";
 
