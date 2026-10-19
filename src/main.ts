@@ -13,7 +13,14 @@ import { BaselineStore, GoogleBody } from "./sync/baseline";
 import { registerCommands } from "./commands";
 import { ObsidianVaultPort } from "./vault/obsidian-port";
 import { friendlyAuthError } from "./google/auth-errors";
-import { checkCredentialFields, checkBridgeResponse, formatCheck } from "./setup-checks";
+import {
+    OWN_CLIENT_NOTE,
+    checkCredentialFields,
+    checkBridgeResponse,
+    formatCheck,
+} from "./setup-checks";
+import { formatPendingLines, formatPushNotice } from "./sync/push-report";
+import { PendingUpdatesModal } from "./pending-modal";
 
 interface PersistedData {
     settings: GoogleSyncSettings;
@@ -274,6 +281,7 @@ export default class GoogleSyncPlugin extends Plugin {
     async validateSetup(): Promise<string> {
         const s = this.settings;
         const lines: string[] = checkCredentialFields(s).map(formatCheck);
+        lines.push(OWN_CLIENT_NOTE);
         const mark = (ok: boolean, label: string) => lines.push(`${ok ? "[ok]" : "[--]"} ${label}`);
 
         const connected = await this.auth.isConnected();
@@ -338,13 +346,8 @@ export default class GoogleSyncPlugin extends Plugin {
             return;
         }
         try {
-            const { synced, failed, blocked } = await this.router.syncAll({ confirmed });
-            if (blocked.length) return; // the router already explained the guard
-            new Notice(
-                failed > 0
-                    ? `Google sync: pushed ${synced} update(s), ${failed} failed (see console).`
-                    : `Google sync: pushed ${synced} update(s).`,
-            );
+            const result = await this.router.syncAll({ confirmed });
+            new Notice(formatPushNotice(result), 10000);
         } catch (e) {
             new Notice(`Google sync error: ${(e as Error).message}`);
         }
@@ -362,15 +365,7 @@ export default class GoogleSyncPlugin extends Plugin {
                 new Notice("Google sync: everything is up to date — nothing to push.");
                 return;
             }
-            const lines = pending.map(
-                (p) =>
-                    `${p.path}: ${p.veto ? `BLOCKED (${p.veto})` : p.changedKeys.join(", ") || "(meet link request)"}`,
-            );
-            console.debug("[google-sync] pending updates:\n" + lines.join("\n"));
-            new Notice(
-                `Google sync: ${pending.length} note(s) have pending updates (details in console).`,
-                8000,
-            );
+            new PendingUpdatesModal(this.app, formatPendingLines(pending)).open();
         } catch (e) {
             new Notice(`Google sync error: ${(e as Error).message}`);
         }

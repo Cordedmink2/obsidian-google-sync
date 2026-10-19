@@ -62,10 +62,10 @@ Use a spare calendar for the first run.
     ---
     ```
 
-- [ ] Run **Sync now**.
+- [ ] Run **Push updates to Google**.
 - [ ] Confirm the event appears in Google Calendar at the right time.
 - [ ] Confirm the note now has a `googleId` frontmatter field.
-- [ ] Change the title in Obsidian and run **Sync now** again.
+- [ ] Change the title in Obsidian and run **Push updates to Google** again.
 - [ ] Confirm Google Calendar updated the existing event instead of creating a duplicate.
 - [ ] Try an all-day event with `allDay: true`.
 - [ ] Delete the test note and confirm the Google event is **not** deleted. This plugin intentionally never deletes Google events or tasks.
@@ -85,10 +85,10 @@ Use a spare Google Tasks list for the first run.
     Notes from iPhone.
     ```
 
-- [ ] Run **Sync now**.
+- [ ] Run **Push updates to Google**.
 - [ ] Confirm the task appears in Google Tasks.
 - [ ] Confirm the note now has a `googleId` frontmatter field.
-- [ ] Set `completed: true` and run **Sync now** again.
+- [ ] Set `completed: true` and run **Push updates to Google** again.
 - [ ] Confirm Google Tasks marks it complete.
 
 ## Google import tests

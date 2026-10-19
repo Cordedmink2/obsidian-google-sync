@@ -43,7 +43,7 @@ Restart Obsidian and enable the plugin.
 
 ## First-time setup
 
-The plugin uses your own Google OAuth client. Tokens and settings stay in your vault's local plugin data.
+This plugin needs its own Google OAuth client; do not reuse another plugin's client. Tokens and settings stay in your vault's local plugin data.
 
 Start here: [Simple Google setup guide](https://github.com/Cordedmink2/obsidian-google-sync/blob/main/docs/google-setup-simple.md)
 
@@ -77,14 +77,14 @@ These settings only affect imports from Google.
 Search for these commands in Obsidian's command palette:
 
 - **Connect to Google**
-- **Import events and tasks from Google**
-- **Sync now**
-- **Preview pending Google updates**
+- **Disconnect from Google**
+- **Push updates to Google**
 - **Push pending updates (confirmed)**
+- **Preview pending Google updates (dry run)**
+- **Import events and tasks from Google**
 - **Run lifecycle scan**
 - **Test connection**
 - **Validate setup**
-- **Disconnect from Google**
 
 ## Folder layout
 
