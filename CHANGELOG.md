@@ -1,3 +1,7 @@
+## Unreleased
+
+- Improved sync safety and feedback: imports preserve your own note properties, missing Google items are confirmed before notes are filed to `orphaned/`, and Push explains when there is nothing to send or why updates were skipped. Added safeguards and regression checks so future changes are less likely to create or delete Google items by mistake.
+
 ## 0.3.14
 
 - Added: a time of day on a task's `due` (`due: 2026-06-01T14:00`) is now kept. Previously

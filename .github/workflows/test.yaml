@@ -40,6 +40,9 @@ jobs:
             - name: Run unit tests
               run: npm run test:unit
 
+            - name: Check mutation resistance
+              run: npm run check:mutation
+
             # Get key to use for the .obsidian-cache GitHub cache. Run wdio.conf.mts directly,
             # which will logs the Obsidian versions to test (see the `if (process.env.CI)` bit
             # in wdio.conf.mts). We'll use that output as the cache key.
