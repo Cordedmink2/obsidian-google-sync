@@ -244,6 +244,15 @@ export async function writeNote(notePath: string, content: string): Promise<void
             const f = app.vault.getAbstractFileByPath(p);
             if (f instanceof obsidian.TFile) await app.vault.modify(f, c);
             else await app.vault.create(p, c);
+            // On Android a freshly created note can read back blank for a moment; write it
+            // again until the content reads back as written, so the plugin never sees a ghost.
+            for (let i = 0; i < 20; i++) {
+                const created = app.vault.getAbstractFileByPath(p);
+                if (!(created instanceof obsidian.TFile)) break;
+                if ((await app.vault.read(created)) === c) break;
+                await app.vault.modify(created, c);
+                await new Promise((r) => setTimeout(r, 100));
+            }
         },
         notePath,
         content,
