@@ -45,7 +45,11 @@ test -f "$VAULT/.google-sync/state.json" || { echo "FAIL: no state.json"; exit 1
 ls "$VAULT"/events/*.md >/dev/null || { echo "FAIL: no event note imported"; exit 1; }
 ls "$VAULT"/tasks/*.md >/dev/null || { echo "FAIL: no task note imported"; exit 1; }
 git -C "$VAULT" status --porcelain | grep -q . && { echo "FAIL: dirty tree after run"; exit 1; }
-git --git-dir="$BARE" log --oneline main | grep -q "google-sync:" || { echo "FAIL: no sync commit on remote"; exit 1; }
+# Capture the log first: `git log | grep -q` under pipefail fails at random when grep exits
+# early and git log takes SIGPIPE.
+remote_log() { git --git-dir="$BARE" log --oneline main; }
+LOG="$(remote_log)"
+grep -q "google-sync:" <<<"$LOG" || { echo "FAIL: no sync commit on remote"; exit 1; }
 
 echo "--- run 2: idempotent (no new commit)"
 COMMITS_BEFORE=$(git --git-dir="$BARE" rev-list --count main)
@@ -71,7 +75,8 @@ git -C "$SCRATCH" push -q origin main
 
 run_sync
 
-git --git-dir="$BARE" log --oneline main | grep -q "remote-side change" || { echo "FAIL: remote commit lost"; exit 1; }
+LOG="$(remote_log)"
+grep -q "remote-side change" <<<"$LOG" || { echo "FAIL: remote commit lost"; exit 1; }
 test -f "$VAULT/unrelated.md" || { echo "FAIL: remote change not pulled into vault"; exit 1; }
 grep -q "status: completed" "$TASK_NOTE" || true  # import may rewrite from mock; the PATCH is what matters
 
