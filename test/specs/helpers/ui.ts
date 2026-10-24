@@ -8,8 +8,7 @@ import * as path from "path";
  * keyboard, filtered by typing, and run with Enter; settings controls are found by their
  * visible label and clicked. No plugin method is called from these helpers.
  */
-export const SHOT_ROOT =
-    process.env.GSYNC_SHOTS ?? "/home/ubuntu/artefacts/obsidian-google-sync/hardening/screenshots";
+export const SHOT_ROOT = process.env.GSYNC_SHOTS ?? path.resolve("test-results", "screenshots");
 
 let shotIndex = 0;
 let shotPlatform = "desktop";
