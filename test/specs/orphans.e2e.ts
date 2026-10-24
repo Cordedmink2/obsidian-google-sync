@@ -43,6 +43,16 @@ async function put(path: string, content: string): Promise<void> {
             const old = app.vault.getAbstractFileByPath(p);
             if (old instanceof obsidian.TFile) await app.vault.delete(old);
             await app.vault.create(p, c);
+            // On Android a freshly created note can read back blank for a moment, and the
+            // import would then see a note with no googleId and (safely) not file it. Write it
+            // again until it reads back as written, so the test exercises the orphan flow.
+            for (let i = 0; i < 20; i++) {
+                const created = app.vault.getAbstractFileByPath(p);
+                if (!(created instanceof obsidian.TFile)) break;
+                if ((await app.vault.read(created)) === c) break;
+                await app.vault.modify(created, c);
+                await new Promise((r) => setTimeout(r, 100));
+            }
         },
         path,
         content,
