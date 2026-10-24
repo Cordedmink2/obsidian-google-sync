@@ -142,6 +142,8 @@ describe("click-through: empty, error and persistence states", function () {
     });
 
     it("settings persist across a real plugin reload", async () => {
+        // The 5xx toast from the previous step may still be on screen; start from a clean view.
+        await clearNotices();
         await openSettings();
         await typeSetting("Mass-update guard", "7");
         await typeSetting("Archive after days past", "9");
@@ -153,7 +155,7 @@ describe("click-through: empty, error and persistence states", function () {
         // Let the debounced save flush, then restart the plugin the way Obsidian does.
         await browser.pause(1200);
         await reloadPlugin();
-        await shot("persist-reloaded");
+        // No frame here: right after a reload nothing is visible that the next frames do not show.
 
         const saved = await readSavedSettings();
         const settings = saved.settings as Record<string, unknown>;
