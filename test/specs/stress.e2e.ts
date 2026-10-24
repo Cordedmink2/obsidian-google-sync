@@ -85,6 +85,31 @@ async function clearVault(): Promise<void> {
 const ids = (files: { text: string }[]) =>
     files.map((f) => /^googleId:\s*"?([^"\n]+)"?$/m.exec(f.text)?.[1]).filter(Boolean) as string[];
 
+/**
+ * Failure diagnostics only: for notes the vault tree does not list, say whether the file
+ * is on disk (adapter) and whether the tree knows the path, so a tree-vs-disk lag is
+ * told apart from a note that was never written.
+ */
+async function describeMissing(missing: string[]): Promise<string> {
+    if (missing.length === 0) return "none";
+    return browser.executeObsidian(async ({ app }, ids) => {
+        const out: string[] = [];
+        for (const folder of ["events", "tasks"]) {
+            const listed = await app.vault.adapter.list(folder);
+            const onDisk = new Set<string>();
+            const walk = async (l: { files: string[]; folders: string[] }): Promise<void> => {
+                l.files.forEach((f) => onDisk.add(f));
+                for (const d of l.folders) await walk(await app.vault.adapter.list(d));
+            };
+            await walk(listed);
+            const inTree = new Set(app.vault.getMarkdownFiles().map((f) => f.path));
+            const diskOnly = [...onDisk].filter((p) => p.endsWith(".md") && !inTree.has(p));
+            out.push(`${folder}: disk=${onDisk.size} tree-lacks-disk=${diskOnly.length}`);
+        }
+        return `${ids.length} ids, e.g. ${ids.slice(0, 5).join(",")}; ${out.join("; ")}`;
+    }, missing);
+}
+
 describe("volume: 500+ events and tasks over many pages, calendars and lists", function () {
     this.timeout(280000);
     const fixture = bulkFixture(new Date());
@@ -108,6 +133,8 @@ describe("volume: 500+ events and tasks over many pages, calendars and lists", f
         ].map((x) => String(x.id));
         expect(r.notice).to.contain(`imported ${nEvents} event(s) and ${nTasks} task(s)`);
         expect(new Set(got).size, "no duplicate notes").to.equal(got.length);
+        const missing = expected.filter((id) => !got.includes(id));
+        expect(missing.length, `missing notes: ${await describeMissing(missing)}`).to.equal(0);
         expect(got.sort()).to.deep.equal(expected.sort());
 
         const calls = await getMockCalls();
