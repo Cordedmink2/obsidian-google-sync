@@ -292,11 +292,9 @@ export async function chooseSetting(settingName: string, optionText: string): Pr
     await browser.pause(900);
 }
 
-/** Click the toggle of a settings row. */
+/** Click the toggle of a settings row (a <label> in current Obsidian, a <div> in 1.6.x). */
 export async function clickToggle(settingName: string): Promise<void> {
-    const t = await browser.$(
-        `${rowXpath(settingName)}//label[contains(@class,"checkbox-container")]`,
-    );
+    const t = await browser.$(`${rowXpath(settingName)}//*[contains(@class,"checkbox-container")]`);
     await reveal(t);
     await t.click();
     await browser.pause(900);
