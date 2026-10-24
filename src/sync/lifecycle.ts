@@ -31,12 +31,17 @@ export class Lifecycle {
             if (isManagedSubpath(ref.path, s.eventsFolder, s.tasksFolder)) continue;
             const kind = detectKind(ref.path, s.eventsFolder, s.tasksFolder);
             if (!kind) continue;
-            notes.push({
-                path: ref.path,
-                basename: ref.basename,
-                kind,
-                fm: await this.port.readFrontmatter(ref.path),
-            });
+            // A note can be renamed or removed between listing and reading (an import
+            // running at the same time). It is simply no longer ours to file this run.
+            if (!(await this.port.exists(ref.path))) continue;
+            let fm: Record<string, unknown>;
+            try {
+                fm = await this.port.readFrontmatter(ref.path);
+            } catch (e) {
+                if (!(await this.port.exists(ref.path))) continue;
+                throw e;
+            }
+            notes.push({ path: ref.path, basename: ref.basename, kind, fm });
         }
 
         const actions = planLifecycle(notes, s, DateTime.now());
@@ -66,6 +71,7 @@ export class Lifecycle {
         for (const ref of await this.port.listMarkdown([s.tasksFolder])) {
             if (ref.basename !== basename) continue;
             if (detectKind(ref.path, s.eventsFolder, s.tasksFolder) !== "task") continue;
+            if (!(await this.port.exists(ref.path))) continue;
             const fm = await this.port.readFrontmatter(ref.path);
             const gid = fm.googleId;
             // The note knows which list it was imported from; only fall back to the
