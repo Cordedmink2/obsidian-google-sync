@@ -6,7 +6,15 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 /** Explicitly allowed identical pairs, by step name without the NN- prefix, e.g. "a|b". */
-export const ALLOW = new Set(/** @type {string[]} */ ([]));
+export const ALLOW = new Set([
+    // Push and Preview both end in the same "nothing to push" toast, so the frames match.
+    "notice-push-nothing|notice-preview-nothing",
+    "empty-push|empty-preview",
+    // Same toast text, in two different specs.
+    "notice-push-nothing|empty-push",
+    // The point of the step: the settings page shows the same values after a reload.
+    "persist-before-reload|persist-after-reload",
+]);
 
 const step = (f) => f.replace(/^\d+-/, "").replace(/\.png$/, "");
 
