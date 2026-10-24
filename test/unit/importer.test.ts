@@ -189,3 +189,49 @@ describe("GoogleImporter failure reporting", () => {
         expect((await importer.importAll()).errors).to.deep.equal([]);
     });
 });
+
+/** A vault whose first write of each new note lands empty, as seen on Android where a
+ * freshly created note can read back blank until it is written again. */
+class LossyFirstWriteVault extends MemoryVault {
+    private readonly dropped = new Set<string>();
+    override async upsertMarkdown(
+        path: string,
+        frontmatter: Record<string, unknown>,
+        body = "",
+    ): Promise<void> {
+        if (!this.dropped.has(path)) {
+            this.dropped.add(path);
+            return super.upsertMarkdown(path, {}, body);
+        }
+        return super.upsertMarkdown(path, frontmatter, body);
+    }
+}
+
+describe("GoogleImporter: notes that read back blank after writing", () => {
+    const events = [
+        { id: "ev1", summary: "Dentist", start: { dateTime: "2026-06-02T09:00:00+12:00" } },
+    ];
+    const tasks = [{ id: "t1", title: "Buy milk", status: "needsAction" }];
+
+    it("verifies each new note by reading it back and rewrites one that came out blank", async () => {
+        const vault = new LossyFirstWriteVault();
+        const counts = await makeImporter(vault, events, tasks).importAll();
+        expect(counts.failed).to.equal(0);
+        for (const p of vault.paths()) expect(vault.fm(p)?.googleId, p).to.be.a("string");
+    });
+
+    it("a second import adopts a blank note at the id-bearing path instead of duplicating it", async () => {
+        const vault = new MemoryVault();
+        vault.seed("events/dentist-ev1.md", {});
+        vault.seed("tasks/buy-milk-t1.md", {});
+        await makeImporter(vault, events, tasks).importAll();
+        expect(vault.paths().filter((p) => p.startsWith("events/"))).to.deep.equal([
+            "events/dentist-ev1.md",
+        ]);
+        expect(vault.paths().filter((p) => p.startsWith("tasks/"))).to.deep.equal([
+            "tasks/buy-milk-t1.md",
+        ]);
+        expect(vault.fm("events/dentist-ev1.md")?.googleId).to.equal("ev1");
+        expect(vault.fm("tasks/buy-milk-t1.md")?.googleId).to.equal("t1");
+    });
+});

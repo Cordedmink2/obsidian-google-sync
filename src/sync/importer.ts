@@ -53,7 +53,37 @@ async function pathFor(
     title: string | undefined,
     fallback: string,
 ): Promise<string> {
-    return unusedPath(port, basePathFor(folder, id, title, fallback));
+    const base = basePathFor(folder, id, title, fallback);
+    // A note at the id-bearing path with no googleId is a blank left by an earlier
+    // write that did not stick (seen on Android). Reuse it rather than adding a -2 twin.
+    if (id && (await port.exists(base))) {
+        const gid = (await port.readFrontmatter(base).catch((): Record<string, unknown> => ({})))
+            .googleId;
+        if (typeof gid !== "string" || !gid) return base;
+    }
+    return unusedPath(port, base);
+}
+
+/**
+ * Write a new note and read it back. Some platforms can return a freshly created note as
+ * blank; one rewrite repairs it, and a note that still reads blank is reported as failed
+ * rather than left as an unindexed stub that the next import would duplicate.
+ */
+async function writeNewNote(
+    port: VaultPort,
+    path: string,
+    fm: Record<string, unknown>,
+): Promise<void> {
+    await port.upsertMarkdown(path, fm);
+    const want = fm.googleId;
+    if (typeof want !== "string" || !want) return;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const got = (await port.readFrontmatter(path).catch((): Record<string, unknown> => ({})))
+            .googleId;
+        if (got === want) return;
+        await port.upsertMarkdown(path, fm);
+    }
+    throw new Error(`note ${path} did not keep its content after writing`);
 }
 
 /**
@@ -198,7 +228,7 @@ export class GoogleImporter {
                     event.summary,
                     "event",
                 );
-                await this.port.upsertMarkdown(path, fm);
+                await writeNewNote(this.port, path, fm);
                 this.onTouch(path);
                 if (event.id) index.set(event.id, path);
                 await this.baselines?.set(path, projectRemoteBody(event as GoogleBody, "event"));
@@ -279,7 +309,7 @@ export class GoogleImporter {
                 task.title,
                 "task",
             );
-            await this.port.upsertMarkdown(path, fm);
+            await writeNewNote(this.port, path, fm);
             this.onTouch(path);
             if (task.id) index.set(task.id, path);
             await this.baselines?.set(path, projectRemoteBody(task as GoogleBody, "task"));
