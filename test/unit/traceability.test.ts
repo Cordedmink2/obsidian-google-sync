@@ -6,7 +6,12 @@ const table = readFileSync("docs/verification/traceability.md", "utf8");
 const rows = table
     .split("\n")
     .filter((l) => l.startsWith("|") && !/^\|\s*-/.test(l))
-    .map((l) => l.split("|").slice(1, -1).map((c) => c.trim()));
+    .map((l) =>
+        l
+            .split("|")
+            .slice(1, -1)
+            .map((c) => c.trim()),
+    );
 const header = rows[0] as string[];
 const body = rows.slice(1);
 
