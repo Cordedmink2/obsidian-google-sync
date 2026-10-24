@@ -220,18 +220,11 @@ describe("GoogleImporter: notes that read back blank after writing", () => {
         for (const p of vault.paths()) expect(vault.fm(p)?.googleId, p).to.be.a("string");
     });
 
-    it("a second import adopts a blank note at the id-bearing path instead of duplicating it", async () => {
+    it("never overwrites an unrelated note that sits at the import path", async () => {
         const vault = new MemoryVault();
-        vault.seed("events/dentist-ev1.md", {});
-        vault.seed("tasks/buy-milk-t1.md", {});
+        vault.seed("events/dentist-ev1.md", { title: "mine" }, "Do not overwrite me.");
         await makeImporter(vault, events, tasks).importAll();
-        expect(vault.paths().filter((p) => p.startsWith("events/"))).to.deep.equal([
-            "events/dentist-ev1.md",
-        ]);
-        expect(vault.paths().filter((p) => p.startsWith("tasks/"))).to.deep.equal([
-            "tasks/buy-milk-t1.md",
-        ]);
-        expect(vault.fm("events/dentist-ev1.md")?.googleId).to.equal("ev1");
-        expect(vault.fm("tasks/buy-milk-t1.md")?.googleId).to.equal("t1");
+        expect(vault.fm("events/dentist-ev1.md")?.title).to.equal("mine");
+        expect(vault.paths().filter((p) => p.startsWith("events/"))).to.have.length(2);
     });
 });

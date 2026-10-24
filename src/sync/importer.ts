@@ -53,15 +53,7 @@ async function pathFor(
     title: string | undefined,
     fallback: string,
 ): Promise<string> {
-    const base = basePathFor(folder, id, title, fallback);
-    // A note at the id-bearing path with no googleId is a blank left by an earlier
-    // write that did not stick (seen on Android). Reuse it rather than adding a -2 twin.
-    if (id && (await port.exists(base))) {
-        const gid = (await port.readFrontmatter(base).catch((): Record<string, unknown> => ({})))
-            .googleId;
-        if (typeof gid !== "string" || !gid) return base;
-    }
-    return unusedPath(port, base);
+    return unusedPath(port, basePathFor(folder, id, title, fallback));
 }
 
 /**
