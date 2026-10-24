@@ -1,3 +1,9 @@
+## Unreleased
+
+- Improved sync safety and feedback: imports preserve your own note properties, missing Google items are confirmed before notes are filed to `orphaned/`, and Push explains when there is nothing to send or why updates were skipped. Added safeguards and regression checks so future changes are less likely to create or delete Google items by mistake.
+- Fixed: on some Android builds a freshly imported note could be read back blank, so the next import created a duplicate (`-2`) copy. The importer now checks each new note and rewrites it if it came back empty.
+- Fixed: the archive/overdue scan no longer stops with "No such note" when an import renames a note while the scan is running; that note is skipped for this run.
+
 ## 0.3.14
 
 - Added: a time of day on a task's `due` (`due: 2026-06-01T14:00`) is now kept. Previously

@@ -1,4 +1,5 @@
 import { browser, expect } from "@wdio/globals";
+import "./helpers/invariantHook";
 import { describe, it } from "mocha";
 
 /**

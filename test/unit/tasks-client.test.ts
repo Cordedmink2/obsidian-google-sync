@@ -24,35 +24,6 @@ describe("GoogleTasksClient", () => {
         expect(calls[1]?.url).to.contain("pageToken=p2");
     });
 
-    it("inserts a task with bearer auth and JSON body", async () => {
-        const { calls, fn } = fakeHttp([jsonResp(200, { id: "t1", title: "Buy milk" })]);
-        const client = new GoogleTasksClient(fn, token, noWaitRetry);
-        const result = await client.insertTask("L1", { title: "Buy milk" });
-        expect(result.id).to.equal("t1");
-        expect(calls[0]?.method).to.equal("POST");
-        expect(calls[0]?.url).to.equal("https://tasks.googleapis.com/tasks/v1/lists/L1/tasks");
-        expect(calls[0]?.headers?.Authorization).to.equal("Bearer test-token");
-    });
-
-    it("inserts a subtask passing parent/previous as query params, not body", async () => {
-        const { calls, fn } = fakeHttp([jsonResp(200, { id: "c1", parent: "p1" })]);
-        const client = new GoogleTasksClient(fn, token, noWaitRetry);
-        await client.insertTask("L1", { title: "Sub" }, { parent: "p1", previous: "s0" });
-        expect(calls[0]?.method).to.equal("POST");
-        expect(calls[0]?.url).to.equal(
-            "https://tasks.googleapis.com/tasks/v1/lists/L1/tasks?parent=p1&previous=s0",
-        );
-        // parent stays out of the request body — the API only honours the query params.
-        expect(JSON.parse(calls[0]?.body ?? "{}")).to.deep.equal({ title: "Sub" });
-    });
-
-    it("inserts a top-level task with no parent/previous query when omitted", async () => {
-        const { calls, fn } = fakeHttp([jsonResp(200, { id: "t1" })]);
-        const client = new GoogleTasksClient(fn, token, noWaitRetry);
-        await client.insertTask("L1", { title: "Top" });
-        expect(calls[0]?.url).to.equal("https://tasks.googleapis.com/tasks/v1/lists/L1/tasks");
-    });
-
     it("moves a task under a parent via the move endpoint", async () => {
         const { calls, fn } = fakeHttp([jsonResp(200, { id: "c1", parent: "p1" })]);
         const client = new GoogleTasksClient(fn, token, noWaitRetry);
@@ -72,6 +43,13 @@ describe("GoogleTasksClient", () => {
         expect(calls[0]?.url).to.contain("/lists/L1/tasks/t1");
     });
 
+    it("has no create capability (one-way: nothing here may insert Google tasks)", () => {
+        const client = new GoogleTasksClient(fakeHttp().fn, token, noWaitRetry);
+        const c = client as unknown as Record<string, unknown>;
+        for (const name of ["insertTask", "createTask", "addTask"])
+            expect(c[name], name).to.equal(undefined);
+    });
+
     it("has no delete capability (one-way: nothing here may delete Google tasks)", () => {
         const client = new GoogleTasksClient(fakeHttp().fn, token, noWaitRetry);
         expect((client as unknown as Record<string, unknown>).deleteTask).to.equal(undefined);
@@ -88,7 +66,7 @@ describe("GoogleTasksClient", () => {
         const client = new GoogleTasksClient(fn, token, noWaitRetry);
         let err: unknown;
         try {
-            await client.insertTask("L1", { title: "X" });
+            await client.patchTask("L1", "t1", { title: "X" });
         } catch (e) {
             err = e;
         }

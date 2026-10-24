@@ -1,6 +1,6 @@
 import { Notice, Plugin, TFile } from "obsidian";
 import { DEFAULT_SETTINGS, GoogleSyncSettings, GoogleSyncSettingTab } from "./settings";
-import { HttpFn } from "./google/http";
+import { HttpFn, guardHttp } from "./google/http";
 import { obsidianHttp } from "./google/transport";
 import { DEFAULT_SCOPES, GoogleAuth, OAuthConfig, TokenSet, TokenStore } from "./google/auth";
 import { CalendarListEntry, GoogleCalendarClient } from "./google/calendar";
@@ -13,7 +13,15 @@ import { BaselineStore, GoogleBody } from "./sync/baseline";
 import { registerCommands } from "./commands";
 import { ObsidianVaultPort } from "./vault/obsidian-port";
 import { friendlyAuthError } from "./google/auth-errors";
-import { checkCredentialFields, checkBridgeResponse, formatCheck } from "./setup-checks";
+import {
+    OWN_CLIENT_NOTE,
+    checkCredentialFields,
+    checkBridgeResponse,
+    formatCheck,
+} from "./setup-checks";
+import { formatImportNotice, formatPendingLines, formatPushNotice } from "./sync/push-report";
+import { describeGoogleError } from "./google/friendly-errors";
+import { PendingUpdatesModal } from "./pending-modal";
 
 interface PersistedData {
     settings: GoogleSyncSettings;
@@ -62,10 +70,10 @@ export default class GoogleSyncPlugin extends Plugin {
         await this.loadAll();
 
         // Late-bound transport so e2e can inject a mock after load.
-        this.http = (req) => {
+        this.http = guardHttp((req) => {
             const injected = (window as unknown as { __gsyncHttp?: HttpFn }).__gsyncHttp;
             return (typeof injected === "function" ? injected : obsidianHttp)(req);
-        };
+        });
 
         this.auth = new GoogleAuth(this.http, () => this.oauthConfig(), this.tokenStore());
         const tokenProvider = () => this.auth.getAccessToken();
@@ -274,6 +282,7 @@ export default class GoogleSyncPlugin extends Plugin {
     async validateSetup(): Promise<string> {
         const s = this.settings;
         const lines: string[] = checkCredentialFields(s).map(formatCheck);
+        lines.push(`Note: ${OWN_CLIENT_NOTE}`);
         const mark = (ok: boolean, label: string) => lines.push(`${ok ? "[ok]" : "[--]"} ${label}`);
 
         const connected = await this.auth.isConnected();
@@ -290,7 +299,7 @@ export default class GoogleSyncPlugin extends Plugin {
                     cals.some((c) => c.id === s.defaultCalendarId);
                 mark(found, `calendar "${s.defaultCalendarId}" among ${cals.length} found`);
             } catch (e) {
-                mark(false, `calendar check failed: ${(e as Error).message}`);
+                mark(false, `calendar check failed: ${describeGoogleError(e)}`);
             }
             try {
                 const lists = await this.tasks.listTaskLists();
@@ -298,7 +307,7 @@ export default class GoogleSyncPlugin extends Plugin {
                     s.taskListId === "@default" || lists.some((l) => l.id === s.taskListId);
                 mark(found, `task list "${s.taskListId}" among ${lists.length} found`);
             } catch (e) {
-                mark(false, `task list check failed: ${(e as Error).message}`);
+                mark(false, `task list check failed: ${describeGoogleError(e)}`);
             }
         }
         return lines.join("\n");
@@ -310,7 +319,7 @@ export default class GoogleSyncPlugin extends Plugin {
             const cals = await this.calendar.listCalendars();
             return `Connection OK — ${cals.length} calendar(s) visible.`;
         } catch (e) {
-            return `Connection failed: ${(e as Error).message}`;
+            return `Connection failed: ${describeGoogleError(e)}`;
         }
     }
 
@@ -338,15 +347,10 @@ export default class GoogleSyncPlugin extends Plugin {
             return;
         }
         try {
-            const { synced, failed, blocked } = await this.router.syncAll({ confirmed });
-            if (blocked.length) return; // the router already explained the guard
-            new Notice(
-                failed > 0
-                    ? `Google sync: pushed ${synced} update(s), ${failed} failed (see console).`
-                    : `Google sync: pushed ${synced} update(s).`,
-            );
+            const result = await this.router.syncAll({ confirmed });
+            new Notice(formatPushNotice(result), 10000);
         } catch (e) {
-            new Notice(`Google sync error: ${(e as Error).message}`);
+            new Notice(`Google sync error: ${describeGoogleError(e)}`);
         }
     }
 
@@ -362,17 +366,9 @@ export default class GoogleSyncPlugin extends Plugin {
                 new Notice("Google sync: everything is up to date — nothing to push.");
                 return;
             }
-            const lines = pending.map(
-                (p) =>
-                    `${p.path}: ${p.veto ? `BLOCKED (${p.veto})` : p.changedKeys.join(", ") || "(meet link request)"}`,
-            );
-            console.debug("[google-sync] pending updates:\n" + lines.join("\n"));
-            new Notice(
-                `Google sync: ${pending.length} note(s) have pending updates (details in console).`,
-                8000,
-            );
+            new PendingUpdatesModal(this.app, formatPendingLines(pending)).open();
         } catch (e) {
-            new Notice(`Google sync error: ${(e as Error).message}`);
+            new Notice(`Google sync error: ${describeGoogleError(e)}`);
         }
     }
 
@@ -382,7 +378,7 @@ export default class GoogleSyncPlugin extends Plugin {
             return;
         }
         try {
-            const { events, tasks, failed, orphaned, lifecycleCounts } =
+            const { events, tasks, failed, orphaned, errors, lifecycleCounts } =
                 await this.runImportPipeline();
             const moved =
                 lifecycleCounts.archived + lifecycleCounts.overdue + lifecycleCounts.completed;
@@ -393,12 +389,14 @@ export default class GoogleSyncPlugin extends Plugin {
             const orphanSuffix =
                 orphaned > 0 ? ` ${orphaned} note(s) filed to orphaned/ (deleted in Google).` : "";
             new Notice(
-                failed > 0
-                    ? `Google sync: imported ${events} event(s), ${tasks} task(s), ${failed} failed.${orphanSuffix}${lifecycleSuffix}`
-                    : `Google sync: imported ${events} event(s) and ${tasks} task(s).${orphanSuffix}${lifecycleSuffix}`,
+                formatImportNotice(
+                    { events, tasks, failed, orphaned, errors },
+                    `${orphanSuffix}${lifecycleSuffix}`,
+                ),
+                10000,
             );
         } catch (e) {
-            new Notice(`Google sync import error: ${(e as Error).message}`);
+            new Notice(`Google sync import error: ${describeGoogleError(e)}`);
         }
     }
 
@@ -422,6 +420,7 @@ export default class GoogleSyncPlugin extends Plugin {
         tasks: number;
         failed: number;
         orphaned: number;
+        errors: string[];
         lifecycleCounts: Awaited<ReturnType<Lifecycle["runOnce"]>>;
     }> {
         if (this.importInFlight) {
@@ -431,6 +430,7 @@ export default class GoogleSyncPlugin extends Plugin {
                 tasks: 0,
                 failed: 0,
                 orphaned: 0,
+                errors: [],
                 lifecycleCounts: { archived: 0, overdue: 0, completed: 0 },
             };
         }
@@ -439,10 +439,11 @@ export default class GoogleSyncPlugin extends Plugin {
             tasks: number;
             failed: number;
             orphaned: number;
+            errors: string[];
             lifecycleCounts: Awaited<ReturnType<Lifecycle["runOnce"]>>;
         };
         this.importInFlight = (async () => {
-            const { events, tasks, failed, orphaned } = await this.importer.importAll({
+            const { events, tasks, failed, orphaned, errors } = await this.importer.importAll({
                 createOnly: options.createOnly,
             });
             const addedOrUpdated = events + tasks;
@@ -454,7 +455,7 @@ export default class GoogleSyncPlugin extends Plugin {
                 this.lastLifecycleRun = Date.now();
                 await this.saveAll();
             }
-            result = { events, tasks, failed, orphaned, lifecycleCounts };
+            result = { events, tasks, failed, orphaned, errors, lifecycleCounts };
         })();
         try {
             await this.importInFlight;

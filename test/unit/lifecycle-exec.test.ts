@@ -45,6 +45,26 @@ describe("Lifecycle execution (port-based)", () => {
         expect(vault.fm("tasks/completed/done.md")?.title).to.equal("Previously filed");
     });
 
+    it("a note that vanishes between listing and reading does not abort the scan", async () => {
+        const vault = new MemoryVault();
+        vault.seed("tasks/gone.md", { title: "Gone", completed: true });
+        vault.seed("tasks/done.md", { title: "Done", completed: true });
+        // Deterministic gate: the note is removed (e.g. renamed by a concurrent import)
+        // after listMarkdown returned it but before its frontmatter is read.
+        const list = vault.listMarkdown.bind(vault);
+        vault.listMarkdown = async (roots: string[]) => {
+            const refs = await list(roots);
+            await vault.move("tasks/gone.md", "elsewhere/gone.md");
+            return refs;
+        };
+        const { lifecycle } = makeLifecycle(vault);
+
+        const counts = await lifecycle.runOnce();
+
+        expect(counts.completed).to.equal(1);
+        expect(vault.paths()).to.include("tasks/completed/done.md");
+    });
+
     it("one failing move does not abort the remaining moves", async () => {
         const vault = new MemoryVault();
         vault.seed("tasks/a.md", { title: "A", completed: true });

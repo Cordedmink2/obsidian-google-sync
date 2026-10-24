@@ -213,7 +213,10 @@ describe("SyncRouter (one-way, baseline-diffed)", () => {
         expect(blockedRun.blocked).to.have.length(4);
         expect(blockedRun.synced).to.equal(0);
         expect(calls).to.have.length(0);
-        expect(notices.join(" ")).to.contain("mass-update guard");
+        // The one user-facing notice is built from the result (formatPushNotice); the router
+        // must not add a second, overlapping one for a whole-vault run.
+        expect(notices.join(" ")).to.not.contain("mass-update guard");
+        expect(blockedRun.limit).to.equal(3);
 
         const confirmedRun = await router.syncAll({ confirmed: true });
         expect(confirmedRun.synced).to.equal(4);

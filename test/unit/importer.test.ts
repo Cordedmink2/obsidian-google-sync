@@ -144,3 +144,87 @@ describe("GoogleImporter (port-based)", () => {
         expect(vault.fm(childPath ?? "")?.parent).to.equal("[[parent-task-p1]]");
     });
 });
+
+describe("GoogleImporter failure reporting", () => {
+    function failingImporter(status: number) {
+        const vault = new MemoryVault();
+        const settings: GoogleSyncSettings = { ...DEFAULT_SETTINGS, taskListId: "L1" };
+        const http: HttpFn = async (req: HttpRequest) => {
+            if (req.url.includes("/calendars/")) {
+                const body = { error: { message: `boom ${status}` } };
+                return { status, headers: {}, text: JSON.stringify(body), json: body };
+            }
+            const body = { items: [{ id: "t1", title: "Survivor" }] };
+            return { status: 200, headers: {}, text: JSON.stringify(body), json: body };
+        };
+        const importer = new GoogleImporter(
+            vault,
+            new GoogleCalendarClient(http, token, noWaitRetry),
+            new GoogleTasksClient(http, token, noWaitRetry),
+            () => settings,
+        );
+        return { vault, importer };
+    }
+
+    it("reports why a phase failed, and still imports the other phase", async () => {
+        const { vault, importer } = failingImporter(403);
+        const counts = await importer.importAll();
+        expect(counts.failed).to.equal(1);
+        expect(counts.errors).to.have.length(1);
+        expect(counts.errors[0]).to.match(/events/i);
+        expect(counts.errors[0]).to.match(/403/);
+        expect(vault.paths().some((p) => p.startsWith("tasks/"))).to.equal(true);
+    });
+
+    it("has no errors when everything imports", async () => {
+        const vault = new MemoryVault();
+        const settings: GoogleSyncSettings = { ...DEFAULT_SETTINGS, taskListId: "L1" };
+        const http = googleStub([], []);
+        const importer = new GoogleImporter(
+            vault,
+            new GoogleCalendarClient(http, token, noWaitRetry),
+            new GoogleTasksClient(http, token, noWaitRetry),
+            () => settings,
+        );
+        expect((await importer.importAll()).errors).to.deep.equal([]);
+    });
+});
+
+/** A vault whose first write of each new note lands empty, as seen on Android where a
+ * freshly created note can read back blank until it is written again. */
+class LossyFirstWriteVault extends MemoryVault {
+    private readonly dropped = new Set<string>();
+    override async upsertMarkdown(
+        path: string,
+        frontmatter: Record<string, unknown>,
+        body = "",
+    ): Promise<void> {
+        if (!this.dropped.has(path)) {
+            this.dropped.add(path);
+            return super.upsertMarkdown(path, {}, body);
+        }
+        return super.upsertMarkdown(path, frontmatter, body);
+    }
+}
+
+describe("GoogleImporter: notes that read back blank after writing", () => {
+    const events = [
+        { id: "ev1", summary: "Dentist", start: { dateTime: "2026-06-02T09:00:00+12:00" } },
+    ];
+    const tasks = [{ id: "t1", title: "Buy milk", status: "needsAction" }];
+
+    it("verifies each new note by reading it back and rewrites one that came out blank", async () => {
+        const vault = new LossyFirstWriteVault();
+        const counts = await makeImporter(vault, events, tasks).importAll();
+        expect(counts.failed).to.equal(0);
+        for (const p of vault.paths()) expect(vault.fm(p)?.googleId, p).to.be.a("string");
+    });
+
+    it("never overwrites an unrelated note that sits at the import path", async () => {
+        const vault = new MemoryVault();
+        vault.seed("events/dentist-ev1.md", { title: "mine" }, "Do not overwrite me.");
+        await makeImporter(vault, events, tasks).importAll();
+        expect(vault.fm("events/dentist-ev1.md")?.title).to.equal("mine");
+        expect(vault.paths().filter((p) => p.startsWith("events/"))).to.have.length(2);
+    });
+});

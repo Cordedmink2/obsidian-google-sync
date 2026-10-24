@@ -1,4 +1,4 @@
-import { HttpFn, RetryOptions, withRetry } from "./http";
+import { HttpFn, RetryOptions, guardHttp, withRetry } from "./http";
 import { GoogleApiError } from "./api";
 
 /**
@@ -142,9 +142,10 @@ async function postToken(
     params: Record<string, string>,
     retry: RetryOptions,
 ): Promise<unknown> {
+    const send = guardHttp(http);
     const res = await withRetry(
         () =>
-            http({
+            send({
                 url: TOKEN_URL,
                 method: "POST",
                 contentType: "application/x-www-form-urlencoded",

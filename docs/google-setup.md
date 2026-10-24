@@ -174,7 +174,7 @@ Before pointing it at your real calendar, do a dry run:
 
 1. Create a spare Google calendar or task list, and select it in the plugin settings.
 2. Add one test note in your `events/` folder and one in `tasks/`.
-3. Run **Sync now** and confirm they appear in Google.
+3. Run **Push updates to Google** and confirm they appear in Google.
 4. Run **Import events and tasks from Google** and confirm notes appear in your vault.
 
 When you're happy, switch the plugin back to your real calendar/list.

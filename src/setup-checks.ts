@@ -4,6 +4,10 @@
  * mobile-safe.
  */
 
+/** D6: said in Validate setup and in the README setup section (a unit test keeps them equal). */
+export const OWN_CLIENT_NOTE =
+    "This plugin needs its own Google OAuth client; do not reuse another plugin's client.";
+
 /** Google OAuth client IDs always end in this suffix. */
 export function isLikelyClientId(value: string): boolean {
     return /\.apps\.googleusercontent\.com$/.test(value.trim());

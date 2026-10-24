@@ -1,6 +1,7 @@
 import { GoogleSyncSettings } from "../settings-data";
 import { GoogleCalendarClient, WriteEventOptions } from "../google/calendar";
 import { GoogleTasksClient } from "../google/tasks";
+import { describeGoogleError } from "../google/friendly-errors";
 import { detectKind, isManagedSubpath, validateEvent, validateTask } from "./frontmatter";
 import { eventToGoogle, taskToGoogle } from "./mapper";
 import { linkToBasename } from "./lifecycle-plan";
@@ -41,6 +42,17 @@ export interface SyncRunResult {
     failed: number;
     /** Paths held back by the mass-update guard (run again confirmed to push them). */
     blocked: string[];
+    /** The mass-update limit in force, for the notice. */
+    limit: number;
+    /** One plain-language reason per failed note, so the push notice can carry it. */
+    failures: string[];
+    /** In-scope notes left alone because they cannot be pushed (counted, never silent). */
+    skipped: SkipCounts;
+}
+
+export interface SkipCounts {
+    pullOnly: number;
+    unlinked: number;
 }
 
 /** Rolling window for the per-note (debounced edit) mass-update guard. */
@@ -102,24 +114,29 @@ export class SyncRouter {
      * blocked paths instead, so a runaway template/script can't fan out across Google.
      */
     async syncAll(options: { confirmed?: boolean } = {}): Promise<SyncRunResult> {
-        const result: SyncRunResult = { synced: 0, failed: 0, blocked: [] };
+        const skips: SkipCounts = { pullOnly: 0, unlinked: 0 };
+        const result: SyncRunResult = {
+            synced: 0,
+            failed: 0,
+            blocked: [],
+            limit: this.maxPatchesPerRun(),
+            failures: [],
+            skipped: skips,
+        };
         const plans: PlannedPatch[] = [];
         const parentIds = new Map<string, string | undefined>();
         for (const ref of await this.port.listMarkdown(this.scopeRoots())) {
             if (!this.syncKind(ref.path)) continue;
             try {
-                const plan = await this.planPath(ref.path, { parentIds });
+                const plan = await this.planPath(ref.path, { parentIds, skips });
                 if (plan) plans.push(plan);
             } catch (e) {
                 result.failed++;
-                this.notify(`Google sync: ${noteName(ref.path)}: ${(e as Error).message}`);
+                result.failures.push(`${noteName(ref.path)}: ${describeGoogleError(e)}`);
             }
         }
         if (!options.confirmed && plans.length > this.maxPatchesPerRun()) {
             result.blocked = plans.map((p) => p.path);
-            this.notify(
-                `Google sync: mass-update guard — ${plans.length} notes have pending updates (limit ${this.maxPatchesPerRun()}). Nothing was sent. Run "Push pending updates (confirmed)" if this is intentional.`,
-            );
             return result;
         }
         for (const plan of plans) {
@@ -128,7 +145,7 @@ export class SyncRouter {
                 result.synced++;
             } catch (e) {
                 result.failed++;
-                this.notify(`Google sync: ${noteName(plan.path)}: ${(e as Error).message}`);
+                result.failures.push(`${noteName(plan.path)}: ${describeGoogleError(e)}`);
             }
         }
         return result;
@@ -170,17 +187,25 @@ export class SyncRouter {
             collectVetoed?: PendingChange[];
             /** Per-run basename → googleId cache for parent resolution (see syncAll/previewAll). */
             parentIds?: Map<string, string | undefined>;
+            /** Receives a count for notes skipped as pull-only / not linked. */
+            skips?: SkipCounts;
         } = {},
     ): Promise<PlannedPatch | null> {
         const kind = this.syncKind(path);
         if (!kind) return null;
         const fm = await this.port.readFrontmatter(path);
-        if (isPullOnly(fm)) return null;
+        if (isPullOnly(fm)) {
+            if (options.skips) options.skips.pullOnly++;
+            return null;
+        }
         const plan =
             kind === "event"
                 ? await this.planEvent(path, fm)
                 : await this.planTask(path, fm, options.parentIds);
-        if (!plan) return null;
+        if (!plan) {
+            if (options.skips && !fm.googleId) options.skips.unlinked++;
+            return null;
+        }
         const baseline = (await this.baselines.get(path)) ?? (await this.fetchRemoteBaseline(plan));
         const patch = diffBody(baseline, plan.body);
         if (!patch) {

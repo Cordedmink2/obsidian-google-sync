@@ -131,7 +131,7 @@ After setup, run:
 
 Then in Obsidian:
 
-1. Run **Sync now**.
+1. Run **Push updates to Google**.
 2. Confirm the sample event/task appear in Google.
 3. Optionally mark the sample task `completed: true` and sync again.
 

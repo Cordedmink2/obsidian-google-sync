@@ -1,4 +1,5 @@
 import { browser } from "@wdio/globals";
+import "./helpers/invariantHook";
 import { before, beforeEach, describe, it } from "mocha";
 import { expect } from "chai";
 import { MockCall, getMockCalls, resetMockCalls, setupGoogleSyncMock } from "./helpers/mockGoogle";
@@ -86,7 +87,7 @@ describe("event sync against mocked Google", function () {
             if (old instanceof obsidian.TFile) await app.vault.delete(old);
             await app.vault.create(
                 path,
-                "---\ntitle: Existing\ndate: 2026-06-03T10:00:00\ntimezone: Pacific/Auckland\ngoogleId: ev-existing\n---\n",
+                "---\ntitle: Existing renamed in vault\ndate: 2026-06-03T10:00:00\ntimezone: Pacific/Auckland\ngoogleId: ev-existing\n---\n",
             );
             await plugin.syncNow();
         });
@@ -96,7 +97,7 @@ describe("event sync against mocked Google", function () {
             "no calendar patch recorded",
         );
         const body = JSON.parse(patch.body ?? "{}") as { summary?: string };
-        expect(body.summary).to.equal("Existing");
+        expect(body.summary).to.equal("Existing renamed in vault");
     });
 
     it("leaves the Google event alone when the note is deleted (one-way)", async () => {

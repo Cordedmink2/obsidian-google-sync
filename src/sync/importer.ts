@@ -1,3 +1,4 @@
+import { describeGoogleError } from "../google/friendly-errors";
 import { GoogleCalendarClient } from "../google/calendar";
 import { GoogleTasksClient } from "../google/tasks";
 import { DEFAULT_SETTINGS, GoogleSyncSettings } from "../settings-data";
@@ -16,6 +17,8 @@ export interface ImportCounts {
     failed: number;
     /** Notes whose Google item was confirmed deleted, filed into orphaned/. */
     orphaned: number;
+    /** Why each failed phase failed, in plain words, for the user-facing notice. */
+    errors: string[];
 }
 
 export interface ImportOptions {
@@ -54,6 +57,28 @@ async function pathFor(
 }
 
 /**
+ * Write a new note and read it back. Some platforms can return a freshly created note as
+ * blank; one rewrite repairs it, and a note that still reads blank is reported as failed
+ * rather than left as an unindexed stub that the next import would duplicate.
+ */
+async function writeNewNote(
+    port: VaultPort,
+    path: string,
+    fm: Record<string, unknown>,
+): Promise<void> {
+    await port.upsertMarkdown(path, fm);
+    const want = fm.googleId;
+    if (typeof want !== "string" || !want) return;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const got = (await port.readFrontmatter(path).catch((): Record<string, unknown> => ({})))
+            .googleId;
+        if (got === want) return;
+        await port.upsertMarkdown(path, fm);
+    }
+    throw new Error(`note ${path} did not keep its content after writing`);
+}
+
+/**
  * One folder scan up front builds the googleId → path index every upsert consults,
  * instead of re-scanning the folder per imported item. First match wins (same as the
  * old scan order); notes created during the run are added by the upserts.
@@ -82,7 +107,7 @@ export class GoogleImporter {
     ) {}
 
     async importAll(options: ImportOptions = {}): Promise<ImportCounts> {
-        const counts: ImportCounts = { events: 0, tasks: 0, failed: 0, orphaned: 0 };
+        const counts: ImportCounts = { events: 0, tasks: 0, failed: 0, orphaned: 0, errors: [] };
         const window = this.eventWindow();
         const seen = emptySeen(window.timeMin, window.timeMax);
         // Events and tasks are imported independently: a failure in one phase must not
@@ -92,6 +117,7 @@ export class GoogleImporter {
             seen.eventsComplete = true;
         } catch (e) {
             counts.failed++;
+            counts.errors.push(`events: ${describeGoogleError(e)}`);
             console.error("[google-sync] event import failed", e);
         }
         try {
@@ -99,6 +125,7 @@ export class GoogleImporter {
             seen.tasksComplete = true;
         } catch (e) {
             counts.failed++;
+            counts.errors.push(`tasks: ${describeGoogleError(e)}`);
             console.error("[google-sync] task import failed", e);
         }
         // Startup (createOnly) imports stay additions-only; full imports also file notes
@@ -193,7 +220,7 @@ export class GoogleImporter {
                     event.summary,
                     "event",
                 );
-                await this.port.upsertMarkdown(path, fm);
+                await writeNewNote(this.port, path, fm);
                 this.onTouch(path);
                 if (event.id) index.set(event.id, path);
                 await this.baselines?.set(path, projectRemoteBody(event as GoogleBody, "event"));
@@ -274,7 +301,7 @@ export class GoogleImporter {
                 task.title,
                 "task",
             );
-            await this.port.upsertMarkdown(path, fm);
+            await writeNewNote(this.port, path, fm);
             this.onTouch(path);
             if (task.id) index.set(task.id, path);
             await this.baselines?.set(path, projectRemoteBody(task as GoogleBody, "task"));
