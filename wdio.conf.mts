@@ -80,5 +80,18 @@ export const config: WebdriverIO.Config = {
 
     cacheDir: cacheDir,
 
+    // Fail the run when two differently-named screenshots are byte-identical.
+    onComplete: async () => {
+        const { findDuplicateShots } = (await import("./scripts/screenshot-dupes.mjs")) as {
+            findDuplicateShots(root: string): string[][];
+        };
+        const root = path.resolve(env.GSYNC_SHOTS ?? "test-results/screenshots");
+        const fs = await import("fs");
+        if (!fs.existsSync(root)) return;
+        const dupes = findDuplicateShots(root);
+        for (const [a, b] of dupes) console.error(`byte-identical screenshots: ${a} == ${b}`);
+        if (dupes.length) process.exitCode = 1;
+    },
+
     injectGlobals: false, // import describe/expect etc explicitly to make eslint happy
 };

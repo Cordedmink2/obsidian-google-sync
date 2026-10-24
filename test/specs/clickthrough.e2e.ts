@@ -11,6 +11,7 @@ import {
     closeSettings,
     dismissOverlays,
     modalText,
+    openNote,
     openSettings,
     readNote,
     removeNotes,
@@ -128,6 +129,8 @@ describe("click-through: connect, import, edit, preview, push", function () {
                 "title: Imported appointment (renamed in vault)",
             ),
         );
+        await clearNotices();
+        await openNote("events/imported-appointment-import-event-1.md");
         await shot("note-edited");
 
         await clearNotices();

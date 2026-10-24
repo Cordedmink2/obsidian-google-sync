@@ -1,5 +1,13 @@
 import { browser } from "@wdio/globals";
 import "./helpers/invariantHook";
+import {
+    clearNotices,
+    revealInExplorer,
+    runCommand,
+    shot,
+    startShots,
+    waitForNotice,
+} from "./helpers/ui";
 import { before, beforeEach, describe, it } from "mocha";
 import { expect } from "chai";
 import {
@@ -74,6 +82,7 @@ const isGet = (c: MockCall, needle: string) => c.method === "GET" && c.url.inclu
 describe("Google-side deletion files the note to orphaned/ (mocked Google)", function () {
     before(async () => {
         await setupGoogleSyncMock();
+        await startShots(70);
     });
     beforeEach(async () => {
         await resetMockCalls();
@@ -244,4 +253,43 @@ describe("Google-side deletion files the note to orphaned/ (mocked Google)", fun
             ).__gsyncMock.state.errors = [];
         });
     });
+
+    // Click-through: the import is run from the command palette like a user would, then the
+    // notice and the orphaned/ folder are captured (desktop and emulated mobile).
+    for (const [kind, folder, name, note, remove] of [
+        [
+            "event",
+            "events",
+            "shot-gone-event",
+            () => eventNote("Shot gone event", "shot-gone-event-1"),
+            () => removeEventInGoogle("primary", "shot-gone-event-1", 404),
+        ],
+        [
+            "task",
+            "tasks",
+            "shot-gone-task",
+            () => taskNote("Shot gone task", "shot-gone-task-1"),
+            () => removeTaskInGoogle("L1", "shot-gone-task-1", 404),
+        ],
+    ] as const) {
+        it(`click-through: palette import files a deleted ${kind} to ${folder}/orphaned/ and the folder shows it`, async () => {
+            await put(`${folder}/${name}.md`, note());
+            await remove();
+            await clearNotices();
+            await runCommand("Import events and tasks from Google", {
+                shotName: `orphan-${kind}-palette-import`,
+            });
+            const n = await waitForNotice("filed to orphaned/");
+            expect(n).to.contain("filed to orphaned/ (deleted in Google)");
+            await shot(`orphan-${kind}-notice`);
+
+            await revealInExplorer(`${folder}/orphaned/${name}.md`);
+            const there = await browser.executeObsidian(
+                ({ app }, f: string) => !!app.vault.getAbstractFileByPath(f),
+                `${folder}/orphaned/${name}.md`,
+            );
+            expect(there, "note filed, not deleted").to.equal(true);
+            await shot(`orphan-${kind}-folder`);
+        });
+    }
 });

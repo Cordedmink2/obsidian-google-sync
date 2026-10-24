@@ -16,6 +16,7 @@ import {
     disableAutoPush,
     dismissOverlays,
     findNoteByGoogleId,
+    openNote,
     readNote,
     removeNotes,
     runCommand,
@@ -114,12 +115,15 @@ describe("click-through edges: user data and due-time refinement", function () {
             .replace(/^---\n/, "---\nmyRating: 5\nmyTags: [alpha, beta]\n")
             .replace(/title: Edge event/, "title: Edge event (mine)");
         await writeNote(p, `${edited.trimEnd()}\n\nMy own meeting notes — keep me.\n`);
+        await clearNotices();
+        await openNote(p);
         await shot("user-data-edited");
 
         await resetMockCalls();
         const n = await pushAll();
         expect(n).to.contain("pushed 1 update(s)");
         await shot("user-data-pushed");
+        await clearNotices();
         const patch = (await getMockCalls()).find((c) => c.method === "PATCH");
         expect(patch, "an update was sent").to.not.equal(undefined);
         expect(patch!.body).to.not.contain("myRating");
@@ -131,6 +135,8 @@ describe("click-through edges: user data and due-time refinement", function () {
         expect(after).to.match(/myTags:\n?\s*(- alpha|\[alpha)/);
         expect(after).to.contain("My own meeting notes — keep me.");
         expect(after).to.contain("title: Edge event (mine)");
+        await clearNotices();
+        await openNote(p);
         await shot("user-data-after-reimport");
     });
 
@@ -175,6 +181,8 @@ describe("click-through edges: user data and due-time refinement", function () {
             );
             await importAll();
             expect(await readNote(p)).to.contain(`due: ${googleDay}${wallTime}`);
+            await clearNotices();
+            await openNote(p);
             await shot(`due-${label.replace(/ /g, "-")}`);
         });
     }
@@ -189,6 +197,8 @@ describe("click-through edges: user data and due-time refinement", function () {
         await importAll();
         const after = (await readNote(p)) as string;
         expect(after).to.contain(`due: ${dayAfter}T14:30`);
+        await clearNotices();
+        await openNote(p);
         await shot("due-date-moved-in-google");
     });
 });

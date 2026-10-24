@@ -259,6 +259,42 @@ export async function writeNote(notePath: string, content: string): Promise<void
     );
 }
 
+/** Open a note in the editor (what the user sees when they click it), so a screenshot shows it. */
+export async function openNote(notePath: string): Promise<void> {
+    await dismissOverlays();
+    await browser.executeObsidian(async ({ app, obsidian }, p: string) => {
+        const f = app.vault.getAbstractFileByPath(p);
+        if (f instanceof obsidian.TFile) await app.workspace.getLeaf(false).openFile(f);
+    }, notePath);
+    await browser.pause(700);
+}
+
+/**
+ * Show a folder in the file explorer: the sidebar is expanded (it is hidden on mobile) and
+ * the explorer scrolls to the path, so a screenshot shows the folder and its contents.
+ */
+export async function revealInExplorer(vaultPath: string): Promise<void> {
+    await dismissOverlays();
+    await browser.executeObsidian(async ({ app, obsidian }, p: string) => {
+        const ws = app.workspace as unknown as { leftSplit?: { expand(): void } };
+        ws.leftSplit?.expand();
+        await (
+            app as unknown as { commands: { executeCommandById(id: string): unknown } }
+        ).commands.executeCommandById("file-explorer:open");
+        const target = app.vault.getAbstractFileByPath(p);
+        if (!target) return;
+        const leaf = app.workspace.getLeavesOfType("file-explorer")[0];
+        const view = leaf?.view as unknown as {
+            revealInFolder?(f: unknown): void;
+            tree?: { setCollapseAll?(b: boolean): void };
+        };
+        if (target instanceof obsidian.TFile || target instanceof obsidian.TFolder) {
+            view?.revealInFolder?.(target);
+        }
+    }, vaultPath);
+    await browser.pause(700);
+}
+
 export async function readNote(notePath: string): Promise<string | null> {
     return browser.executeObsidian(async ({ app, obsidian }, p: string) => {
         const f = app.vault.getAbstractFileByPath(p);
