@@ -2,19 +2,24 @@
 // Fails when two differently-named screenshots in one run are byte-identical (a frame that
 // does not show the step it is named for), unless the pair is allow-listed below.
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
 
-/** Explicitly allowed identical pairs, by step name without the NN- prefix, e.g. "a|b". */
-export const ALLOW = new Set([
-    // Push and Preview both end in the same "nothing to push" toast, so the frames match.
-    "notice-push-nothing|notice-preview-nothing",
-    "empty-push|empty-preview",
-    // Same toast text, in two different specs.
-    "notice-push-nothing|empty-push",
+/**
+ * Explicitly allowed identical groups, by step name without the NN- prefix. Frames inside one
+ * group may match each other; any other identical pair fails.
+ */
+export const ALLOW_GROUPS = [
+    // Push and Preview with nothing pending end in the same "nothing to push" toast.
+    ["notice-push-nothing", "notice-preview-nothing", "empty-push", "empty-preview"],
     // The point of the step: the settings page shows the same values after a reload.
-    "persist-before-reload|persist-after-reload",
-]);
+    ["persist-before-reload", "persist-after-reload"],
+    // The palette with the same command typed, before two different imports.
+    ["palette-import", "orphan-event-palette-import", "orphan-task-palette-import"],
+];
+export const ALLOW = new Set(
+    ALLOW_GROUPS.flatMap((g) => g.flatMap((a) => g.filter((b) => b !== a).map((b) => `${a}|${b}`))),
+);
 
 const step = (f) => f.replace(/^\d+-/, "").replace(/\.png$/, "");
 
@@ -43,8 +48,14 @@ export function findDuplicateShots(root, allow = ALLOW) {
     return out;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
-    const root = path.resolve(process.argv[2] ?? "test-results/screenshots");
+if (process.argv[2] === "--clean") {
+    // Start of an E2E run: drop frames left by an earlier run so only this run is compared.
+    const root = path.resolve(process.env.GSYNC_SHOTS ?? "test-results/screenshots");
+    rmSync(root, { recursive: true, force: true });
+} else if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
+    const root = path.resolve(
+        process.argv[2] ?? process.env.GSYNC_SHOTS ?? "test-results/screenshots",
+    );
     const dupes = findDuplicateShots(root);
     for (const [a, b] of dupes) console.error(`byte-identical screenshots: ${a} == ${b}`);
     if (dupes.length) process.exit(1);

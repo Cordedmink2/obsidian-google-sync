@@ -24,4 +24,11 @@ describe("screenshot duplicate check", () => {
         const root = shots({ "01-a.png": "same", "02-b.png": "same" });
         expect(findDuplicateShots(root, new Set(["a|b"]))).to.have.length(0);
     });
+    it("the shipped allow-list does not let an unrelated pair through", async () => {
+        const { ALLOW } = (await import("../../scripts/screenshot-dupes.mjs")) as {
+            ALLOW: Set<string>;
+        };
+        expect(ALLOW.has("notice-push-nothing|empty-push")).to.equal(true);
+        expect(ALLOW.has("note-edited|notice-push-1")).to.equal(false);
+    });
 });
